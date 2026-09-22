@@ -4,30 +4,16 @@ When two official records of the same place cannot both be right, that disagreem
 
 This is not a merged map. Merged maps hide the fight. SPLITRECORD ranks the fight.
 
-**Owner:** Digital Currensy Inc.  
+**Owner:** Digital Currensy Inc.
 **Status:** Private. Independent tool. Not a NASA Space Apps 2026 submission.
+**License of our code:** Apache-2.0
 
-## One sentence
-Name both products. Show where they disagree. Say which decision that disagreement breaks.
+## Wave freeze
 
-## What it is not
-- Not a fire-season calendar
-- Not a chatbot on NASA PDFs
-- Not NASA-endorsed
-- Not a claim that one satellite is "wrong" without versions and dates
+W0–W4 frozen. Tulare HUC8 18030012. GRACE+MODIS residual. HLS NIR vs S1 VV. MK/Sen/BH FDR. Cite + FNV checksum + paid report $4k–$12k. No granules. URS 1–5 human last.
 
-## First vertical
-Green canopy vs falling groundwater in one California basin (NDVI-class vegetation vs GRACE-FO water storage).
+## Run
 
-## Repo map
-- `docs/WHITEPAPER.md` — problem and method
-- `docs/BUSINESS.md` — who pays
-- `docs/ARCHITECTURE.md` — wiring
-- `docs/SOW.md` — build waves
-- `docs/IP.md` — what we own
-- `docs/AGENTS.md` — how the seats work together
-- `docs/COUNCIL.md` — station leads (roles, not hired celebrities)
-- `src/splitrecord/` — code written here
-
-## Name check
-Working title "Dual-Truth Engine" is retired. TruthEngine® is a live UK review-fraud company. "Truth Engine" is also a shopping-verification role at Product.ai. SPLITRECORD is the cleared product name pending trademark counsel.
+```
+PYTHONPATH=src python -m unittest tests.test_kernel
+```
