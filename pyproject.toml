@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "splitrecord"
+version = "0.1.0"
+description = "Score the disagreement between two aligned records. Residual is z(A) minus z(B)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
+authors = [{name = "Digital Currensy Inc."}]
+
+[tool.setuptools.packages.find]
+where = ["src"]

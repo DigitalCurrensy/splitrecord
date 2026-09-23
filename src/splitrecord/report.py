@@ -34,17 +34,20 @@ def fnv1a_32(text: str) -> str:
 
 def compile_report(left: list[float], right: list[float]) -> dict:
     r = residual(left, right)
+    slope = sen_slope(r)
+    s = mann_kendall(r)
     body = (
-        f"SPLITRECORD. {BASIN} HUC8 {HUC8}. Residual named. "
-        "Sen and Mann-Kendall on the fight, not a merged map. "
+        f"SPLITRECORD. {BASIN} HUC8 {HUC8}. Residual is z(A) minus z(B). "
+        f"Sen {slope:.4f}. Mann-Kendall S {s}. "
+        "S is a count, not a significance test. "
         "No granules. Not NASA-endorsed. Counsel unsigned."
     )
     words = len(body.split())
     return {
         "basin": BASIN,
         "huc8": HUC8,
-        "sen": sen_slope(r),
-        "mk": mann_kendall(r),
+        "sen": slope,
+        "mk": s,
         "checksum": fnv1a_32(body),
         "body": body,
         "words": words,

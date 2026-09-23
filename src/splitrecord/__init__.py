@@ -15,6 +15,22 @@
 """SPLITRECORD — when two official records disagree, that disagreement is the product."""
 
 from .report import compile_report, fnv1a_32
-from .score import mann_kendall, residual, sen_slope
+from .score import (
+    mann_kendall,
+    mann_kendall_p,
+    mann_kendall_variance,
+    residual,
+    sen_slope,
+    zscores,
+)
 
-__all__ = ["compile_report", "fnv1a_32", "mann_kendall", "residual", "sen_slope"]
+__all__ = [
+    "compile_report",
+    "fnv1a_32",
+    "mann_kendall",
+    "mann_kendall_p",
+    "mann_kendall_variance",
+    "residual",
+    "sen_slope",
+    "zscores",
+]
