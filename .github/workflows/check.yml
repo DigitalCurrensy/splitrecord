@@ -19,5 +19,5 @@ jobs:
       - name: Seasonal example
         run: python -m splitrecord examples/left.csv examples/right.csv --seasons 2 --covariance
       - name: Prewhiten example
-        run: python -m splitrecord examples/left.csv examples/right.csv --prewhiten
+        run: python -m splitrecord examples/pw_left.csv examples/pw_right.csv --prewhiten
 

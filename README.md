@@ -33,16 +33,35 @@ rows=12 residual=z(A)-z(B) seasons=2 theil_sen_z_per_year=... seasonal_S=... var
 
 von Storch pre-whitening is not implemented. That method removes lag-1 before removing the slope, and part of a real trend leaves with it.
 
+## Pre-whitening example
+
+`examples/pw_left.csv` is `0 1 2 3 4 5 6 7 8`. `examples/pw_right.csv` is `0 2 1 3 2 4 3 5 4`. Nine rows. The row index is the time, starting at 0. The rows are equally spaced. There is no date column.
+
+Sen's slope is the median of all 36 pairwise slopes, `36 = 9×8/2`. Each slope is `(v_j − v_i) / (j − i)`. Thirty-six is even, so the median is the average of the 18th and 19th slopes after sorting. In this file those two slopes are the same number, `0.04892060565`. That is `removed_sen`.
+
+The four steps on the residual `z(A)−z(B)`:
+
+1. Remove that slope. Row `t` becomes `residual_t − removed_sen × t`. The remainder alternates `0.225955` and `-0.722729`.
+2. Lag-1 of that remainder is `-0.888889`. One mean, full sum of squares. It is negative because each row is the opposite of the row before it.
+3. Whiten from the second row: `remainder_t − r1 × remainder_{t−1}`. One row is used up.
+4. Add the same slope back at the same index: whitened_t `+ removed_sen × t`.
+
 ```
-rows=12 residual=z(A)-z(B) series=trend-free-prewhiten whitened_rows=11 r1=... theil_sen_z_per_row=... mann_kendall_S=... variance=ordinary p=...
+python -m splitrecord examples/pw_left.csv examples/pw_right.csv --prewhiten
 ```
+
+```
+rows=9 residual=z(A)-z(B) series=trend-free-prewhiten whitened_rows=8 removed_sen=0.04892060565 r1=-0.888889 theil_sen_z_per_row=0.04892060565 mann_kendall_S=22 variance=ordinary p=0.00937477
+```
+
+`removed_sen` is the slope that was taken off. `theil_sen_z_per_row` is the Sen slope of the blended series. They match in this file. They do not match in every file. `variance=ordinary` is not Hamed-Rao.
 
 ```
 pip install -e .
 python -m unittest tests.test_kernel
 python -m splitrecord examples/left.csv examples/right.csv
 python -m splitrecord examples/left.csv examples/right.csv --seasons 12
-python -m splitrecord examples/left.csv examples/right.csv --prewhiten
+python -m splitrecord examples/pw_left.csv examples/pw_right.csv --prewhiten
 ```
 
 Copyright 2026 Digital Currensy Inc. License Apache-2.0. LICENSE is unmodified. Copyright notice is in NOTICE and the file headers.

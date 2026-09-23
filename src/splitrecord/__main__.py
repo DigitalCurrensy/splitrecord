@@ -103,8 +103,9 @@ def main(argv: list[str] | None = None) -> int:
         series = residual(read_column(left_path), read_column(right_path))
         whitened: list[float] | None = None
         r1 = 0.0
+        removed = 0.0
         if prewhiten:
-            whitened, r1 = trend_free_prewhiten(series)
+            whitened, r1, removed = trend_free_prewhiten(series)
             slope = sen_slope(whitened)
             s = mann_kendall(whitened)
             p = mann_kendall_p_ordinary(whitened)
@@ -132,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
         assert whitened is not None
         print(
             f"rows={len(series)} residual=z(A)-z(B) series=trend-free-prewhiten "
-            f"whitened_rows={len(whitened)} r1={r1:.6g} "
+            f"whitened_rows={len(whitened)} removed_sen={removed:.10g} r1={r1:.6g} "
             f"theil_sen_z_per_row={slope:.10g} mann_kendall_S={s} "
             f"variance=ordinary p={p_text}"
         )

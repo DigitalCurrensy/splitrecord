@@ -389,12 +389,17 @@ def mann_kendall_p_ordinary(values: Sequence[float]) -> float | None:
     return math.erfc(abs(z) / math.sqrt(2))
 
 
-def trend_free_prewhiten(values: Sequence[float]) -> tuple[list[float], float]:
+def trend_free_prewhiten(values: Sequence[float]) -> tuple[list[float], float, float]:
     """Yue, Pilon, Phinney, and Cavadias (2002) trend-free pre-whitening.
 
-    Remove the Theil-Sen slope, estimate lag-1 on that remainder, whiten
-    the remainder, then add the slope back. The returned series has length
-    n-1 because each point uses the one before it. Requires len >= 3.
+    Returns the blended series, the lag-1 of the detrended remainder, and
+    the Theil-Sen slope that was removed. Time is the row index, starting
+    at 0. The blended series has length n-1. Requires len >= 3.
+
+    Sen's slope is the median of every pairwise slope (v_j - v_i) / (j - i).
+    An even count averages the two middle slopes. That is the slope removed
+    here. The slope of the blended series is computed again by the caller
+    and can differ.
 
     von Storch pre-whitening, which removes lag-1 before removing the slope,
     is not this function. That order deletes part of the trend. Hamed-Rao
@@ -410,4 +415,4 @@ def trend_free_prewhiten(values: Sequence[float]) -> tuple[list[float], float]:
     for t in range(1, len(values)):
         whitened = detrended[t] - r1 * detrended[t - 1]
         blended.append(whitened + beta * t)
-    return blended, r1
+    return blended, r1, beta

@@ -297,7 +297,7 @@ class PrewhitenTests(unittest.TestCase):
 
     def test_line_keeps_its_slope(self) -> None:
         series = [float(i) for i in range(6)]
-        whitened, r1 = trend_free_prewhiten(series)
+        whitened, r1, _beta = trend_free_prewhiten(series)
         self.assertEqual(r1, 0.0)
         self.assertEqual(len(whitened), 5)
         self.assertEqual(sen_slope(whitened), 1.0)
@@ -307,7 +307,7 @@ class PrewhitenTests(unittest.TestCase):
         beta = sen_slope(series)
         detrended = [value - beta * index for index, value in enumerate(series)]
         r1 = lag1(detrended)
-        whitened, got_r = trend_free_prewhiten(series)
+        whitened, got_r, _beta = trend_free_prewhiten(series)
         self.assertAlmostEqual(got_r, r1)
         self.assertEqual(len(whitened), len(series) - 1)
         for t in range(1, len(series)):
@@ -340,10 +340,48 @@ class PrewhitenTests(unittest.TestCase):
         self.assertRegex(
             line.stdout.strip(),
             r"^rows=12 residual=z\(A\)-z\(B\) series=trend-free-prewhiten "
-            r"whitened_rows=11 r1=\S+ theil_sen_z_per_row=\S+ "
+            r"whitened_rows=11 removed_sen=\S+ r1=\S+ theil_sen_z_per_row=\S+ "
             r"mann_kendall_S=-?\d+ variance=ordinary p=\S+$",
         )
         self.assertNotIn("hamed-rao", line.stdout)
+
+
+
+class PrewhitenExampleTests(unittest.TestCase):
+    def test_pw_files_match_the_readme_line(self) -> None:
+        env = dict(os.environ, PYTHONPATH=str(SRC))
+        proc = subprocess.run(
+            [
+                sys.executable, "-m", "splitrecord",
+                str(ROOT / "examples" / "pw_left.csv"),
+                str(ROOT / "examples" / "pw_right.csv"),
+                "--prewhiten",
+            ],
+            cwd=ROOT, env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        line = proc.stdout.strip()
+        self.assertEqual(
+            line,
+            "rows=9 residual=z(A)-z(B) series=trend-free-prewhiten "
+            "whitened_rows=8 removed_sen=0.04892060565 r1=-0.888889 "
+            "theil_sen_z_per_row=0.04892060565 mann_kendall_S=22 "
+            "variance=ordinary p=0.00937477",
+        )
+        series = residual(
+            [float(v) for v in (ROOT / "examples" / "pw_left.csv").read_text().split()],
+            [float(v) for v in (ROOT / "examples" / "pw_right.csv").read_text().split()],
+        )
+        slopes = [
+            (series[j] - series[i]) / (j - i)
+            for i in range(len(series))
+            for j in range(i + 1, len(series))
+        ]
+        self.assertEqual(len(slopes), 36)
+        slopes.sort()
+        median = 0.5 * (slopes[17] + slopes[18])
+        self.assertAlmostEqual(median, sen_slope(series))
+        self.assertIn(f"removed_sen={median:.10g}", line)
 
 
 if __name__ == "__main__":
