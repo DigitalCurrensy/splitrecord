@@ -56,22 +56,69 @@ def residual(a: Sequence[float], b: Sequence[float]) -> list[float]:
     return [x - y for x, y in zip(za, zb)]
 
 
-def sen_slope(values: Sequence[float]) -> float:
-    """Median pairwise slope. Requires at least two points."""
+# Two-sided 5% standard-normal bound, Φ^{-1}(0.975).
+Z_95 = 1.95996398454
+
+
+def pairwise_slopes(values: Sequence[float]) -> list[float]:
+    """Every (v_j - v_i) / (j - i), sorted ascending.
+
+    j and i are zero-based row indexes. The rows are equally spaced.
+    Requires at least two finite points.
+    """
     n = len(values)
-    _finite(values)
-    slopes = []
-    for i in range(n):
-        for j in range(i + 1, n):
-            denom = j - i
-            slopes.append((values[j] - values[i]) / denom)
-    slopes.sort()
-    m = len(slopes)
-    if m == 0:
+    if n < 2:
         raise ValueError("not enough")
+    _finite(values)
+    slopes = [
+        (values[j] - values[i]) / (j - i)
+        for i in range(n)
+        for j in range(i + 1, n)
+    ]
+    slopes.sort()
+    return slopes
+
+
+def sen_slope(values: Sequence[float]) -> float:
+    """Median of the pairwise slopes. The Sen (1968) estimator.
+
+    An odd count takes the middle slope. An even count averages the two
+    middle slopes. There is no intercept.
+    """
+    slopes = pairwise_slopes(values)
+    m = len(slopes)
     if m % 2:
         return slopes[m // 2]
     return 0.5 * (slopes[m // 2 - 1] + slopes[m // 2])
+
+
+def sen_limits(values: Sequence[float], variance: float) -> tuple[str, str]:
+    """95% limits from the Gilbert (1987) ranks of the sorted slopes.
+
+    C = Z_95 * sqrt(variance). With k slopes,
+    rank_lo = round((k - C) / 2) and rank_up = round((k + C) / 2 + 1).
+    Ranks are 1-based. A half rounds to even. The slopes at those ranks
+    are the limits. This is the index rule used by the trend package.
+
+    The caller chooses variance. The tie-corrected Mann-Kendall variance
+    is Sen's interval. That same variance times the Hamed-Rao factor is
+    not Sen's interval. n < 8 returns ("short", "short"). A variance that
+    is not positive returns ("dependent", "dependent"). Ranks outside 1..k
+    return ("wide", "wide").
+    """
+    n = len(values)
+    if n < 8:
+        return "short", "short"
+    if not math.isfinite(variance) or variance <= 0.0:
+        return "dependent", "dependent"
+    slopes = pairwise_slopes(values)
+    k = len(slopes)
+    c = Z_95 * math.sqrt(variance)
+    rank_lo = round((k - c) / 2.0)
+    rank_up = round((k + c) / 2.0 + 1.0)
+    if rank_lo < 1 or rank_up > k or rank_lo > rank_up:
+        return "wide", "wide"
+    return f"{slopes[rank_lo - 1]:.10g}", f"{slopes[rank_up - 1]:.10g}"
 
 
 def mann_kendall(values: Sequence[float]) -> int:
@@ -221,7 +268,7 @@ def hamed_rao_factor(values: Sequence[float]) -> float:
     if n < 3:
         return 1.0
     ranks = average_ranks(detrend(values))
-    threshold = 1.95996398454 / math.sqrt(n)
+    threshold = Z_95 / math.sqrt(n)
     total = 0.0
     for i in range(1, n):
         rho = rank_autocorr(ranks, i)

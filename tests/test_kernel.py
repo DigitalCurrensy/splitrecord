@@ -43,6 +43,9 @@ from splitrecord.score import (  # noqa: E402
     seasonal_s,
     seasonal_sen_slope,
     seasonal_variance,
+    sen_limits,
+    pairwise_slopes,
+    Z_95,
     sen_slope,
     tie_counts,
     trend_free_prewhiten,
@@ -192,6 +195,7 @@ class CommandTests(unittest.TestCase):
         self.assertRegex(
             lines[0],
             r"^rows=12 residual=z\(A\)-z\(B\) theil_sen_z_per_row=\S+ "
+            r"sen95_lo=\S+ sen95_hi=\S+ hamed95_lo=\S+ hamed95_hi=\S+ "
             r"mann_kendall_S=-?\d+ tau=\S+ var=\S+ n_over_nstar=\S+ z=\S+ variance=hamed-rao p=\S+$",
         )
         s_token = next(part for part in lines[0].split() if part.startswith("mann_kendall_S="))
@@ -343,6 +347,7 @@ class PrewhitenTests(unittest.TestCase):
             line.stdout.strip(),
             r"^rows=12 residual=z\(A\)-z\(B\) series=trend-free-prewhiten "
             r"whitened_rows=11 removed_sen=\S+ r1=\S+ theil_sen_z_per_row=\S+ "
+            r"sen95_lo=\S+ sen95_hi=\S+ "
             r"mann_kendall_S=-?\d+ tau=\S+ var=\S+ z=\S+ variance=ordinary p=\S+$",
         )
         self.assertNotIn("hamed-rao", line.stdout)
@@ -367,7 +372,7 @@ class PrewhitenExampleTests(unittest.TestCase):
             line,
             "rows=9 residual=z(A)-z(B) series=trend-free-prewhiten "
             "whitened_rows=8 removed_sen=0.04892060565 r1=-0.888889 "
-            "theil_sen_z_per_row=0.04892060565 mann_kendall_S=22 "
+            "theil_sen_z_per_row=0.04892060565 sen95_lo=0.02783875459 sen95_hi=0.0840570241 mann_kendall_S=22 "
             "tau=0.7857142857 var=65.33333333 z=2.598076211 variance=ordinary p=0.00937477",
         )
         series = residual(
@@ -405,6 +410,33 @@ class MannKendallTests(unittest.TestCase):
         self.assertAlmostEqual(p, math.erfc(abs(z) / math.sqrt(2.0)))
         straight = mann_kendall_z([float(i) for i in range(10)], hamed=True)
         self.assertEqual(straight[3], 1.0)
+
+
+
+class SenLimitTests(unittest.TestCase):
+    def test_gilbert_ranks(self) -> None:
+        series = [1.0, 3.0, 2.0, 5.0, 4.0, 6.0, 8.0, 7.0]
+        slopes = pairwise_slopes(series)
+        var = mann_kendall_variance(len(series))
+        c = Z_95 * math.sqrt(var)
+        k = len(slopes)
+        rank_lo = round((k - c) / 2.0)
+        rank_up = round((k + c) / 2.0 + 1.0)
+        self.assertEqual(rank_lo, 6)
+        self.assertEqual(rank_up, 23)
+        lo, hi = sen_limits(series, var)
+        self.assertEqual(lo, f"{slopes[rank_lo - 1]:.10g}")
+        self.assertEqual(hi, f"{slopes[rank_up - 1]:.10g}")
+        self.assertEqual(sen_limits([float(i) for i in range(7)], var), ("short", "short"))
+
+    def test_hamed_interval_uses_the_corrected_variance(self) -> None:
+        series = [1.0, 1.4, 1.1, 2.2, 1.8, 2.9, 2.4, 3.6, 3.0, 4.1, 3.7, 4.8]
+        _s, _tau, corrected, factor, _z, _p = mann_kendall_z(series, hamed=True)
+        ordinary = mann_kendall_variance(len(series), tie_counts(series))
+        self.assertAlmostEqual(factor, 0.08583916084)
+        self.assertEqual(sen_limits(series, ordinary), ("0.25", "0.38"))
+        self.assertEqual(sen_limits(series, corrected), ("0.3166666667", "0.3454545455"))
+        self.assertNotEqual(sen_limits(series, ordinary), sen_limits(series, corrected))
 
 
 if __name__ == "__main__":

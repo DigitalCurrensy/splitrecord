@@ -20,11 +20,14 @@ import math
 import sys
 
 from .score import (
+    mann_kendall_variance,
     mann_kendall_z,
     residual,
     seasonal_s,
     seasonal_sen_slope,
     seasonal_zp,
+    sen_limits,
+    tie_counts,
     sen_slope,
     trend_free_prewhiten,
 )
@@ -84,6 +87,14 @@ def _parse(args: list[str]) -> tuple[str, str, int | None, bool, bool]:
     return files[0], files[1], seasons, covariance, prewhiten
 
 
+def _sen_fields(values: list[float], ordinary: float, corrected: float | None = None) -> str:
+    lo, hi = sen_limits(values, ordinary)
+    if corrected is None:
+        return f"sen95_lo={lo} sen95_hi={hi}"
+    hlo, hhi = sen_limits(values, corrected)
+    return f"sen95_lo={lo} sen95_hi={hi} hamed95_lo={hlo} hamed95_hi={hhi}"
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     try:
@@ -110,6 +121,7 @@ def main(argv: list[str] | None = None) -> int:
         elif seasons is None:
             slope = sen_slope(series)
             s, tau, var, factor, z, p = mann_kendall_z(series, hamed=True)
+            ordinary = mann_kendall_variance(len(series), tie_counts(series))
             tested = series
         else:
             slope = seasonal_sen_slope(series, seasons)
@@ -135,14 +147,16 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"rows={len(series)} residual=z(A)-z(B) series=trend-free-prewhiten "
             f"whitened_rows={len(whitened)} removed_sen={removed:.10g} r1={r1:.6g} "
-            f"theil_sen_z_per_row={slope:.10g} mann_kendall_S={s} tau={tau_text} "
+            f"theil_sen_z_per_row={slope:.10g} {_sen_fields(whitened, var)} "
+            f"mann_kendall_S={s} tau={tau_text} "
             f"var={var_text} z={z_text} variance=ordinary p={p_text}"
         )
     elif seasons is None:
         tau_text = "tied" if tau is None else f"{tau:.10g}"
         print(
             f"rows={len(series)} residual=z(A)-z(B) "
-            f"theil_sen_z_per_row={slope:.10g} mann_kendall_S={s} tau={tau_text} "
+            f"theil_sen_z_per_row={slope:.10g} {_sen_fields(series, ordinary, var)} "
+            f"mann_kendall_S={s} tau={tau_text} "
             f"var={var_text} n_over_nstar={factor:.10g} z={z_text} "
             f"variance=hamed-rao p={p_text}"
         )
