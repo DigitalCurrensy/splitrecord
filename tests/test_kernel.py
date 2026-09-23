@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import subprocess
 import sys
@@ -28,6 +29,7 @@ if str(SRC) not in sys.path:
 
 from splitrecord.report import compile_report, fnv1a_32  # noqa: E402
 from splitrecord.score import (  # noqa: E402
+    hamed_rao_factor,
     mann_kendall,
     mann_kendall_p,
     mann_kendall_variance,
@@ -87,10 +89,9 @@ class ScoreTests(unittest.TestCase):
     def test_p_none_when_short(self) -> None:
         self.assertIsNone(mann_kendall_p([1.0, 2.0, 3.0]))
         self.assertIsNone(mann_kendall_p([float(i) for i in range(7)]))
-        self.assertIsNone(mann_kendall_p(list(range(8))))
 
     def test_p_long_series(self) -> None:
-        self.assertEqual(mann_kendall_variance(10), 10 * 9 * (20 + 5) / 18)
+        self.assertEqual(mann_kendall_variance(10), 10 * 9 * 25 / 18)
         repeated = [1.0, 1.0, 1.0, 2.0, 3.0, 4.0]
         bare = mann_kendall_variance(len(repeated))
         term = 3 * (3 - 1) * (2 * 3 + 5) / 18
@@ -98,10 +99,22 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(tie_counts(repeated), [3])
         self.assertEqual(corrected, bare - term)
         self.assertLess(corrected, bare)
-        # A straight line is dependent.
-        self.assertIsNone(mann_kendall_p(list(range(8))))
-        self.assertIsNone(mann_kendall_p(list(range(10))))
-        # Alternating series: lag-1 is negative, so the variance is not deflated.
+        straight = [float(i) for i in range(10)]
+        self.assertAlmostEqual(hamed_rao_factor(straight), 1.0, delta=1e-9)
+        p_line = mann_kendall_p(straight)
+        self.assertIsNotNone(p_line)
+        assert p_line is not None
+        self.assertLess(p_line, 0.05)
+        s = mann_kendall(straight)
+        var = mann_kendall_variance(10)
+        sign = (s > 0) - (s < 0)
+        z = (s - sign) / math.sqrt(var)
+        self.assertAlmostEqual(p_line, math.erfc(abs(z) / math.sqrt(2.0)))
+        # Three identical shapes. After Sen detrending the ranks still repeat,
+        # so at least one lag clears the normal bound and the factor is not 1.
+        repeats = [5.0, 5.0, 5.0, 0.0] * 3
+        self.assertEqual(len(repeats), 12)
+        self.assertGreater(hamed_rao_factor(repeats), 1.0)
         wobble = [0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
         p_flat = mann_kendall_p(wobble)
         self.assertIsNotNone(p_flat)
@@ -153,7 +166,7 @@ class CommandTests(unittest.TestCase):
         self.assertNotIn("Traceback", proc.stderr)
         lines = proc.stdout.splitlines()
         self.assertEqual(len(lines), 1)
-        self.assertRegex(lines[0], r"^n=12 sen=\S+ S=-?\d+ p=dependent$")
+        self.assertRegex(lines[0], r"^n=12 sen=\S+ S=-?\d+ p=\S+$")
         self.assertIn("n=12", lines[0])
         s_token = next(part for part in lines[0].split() if part.startswith("S="))
         s_value = int(s_token.split("=", 1)[1])
