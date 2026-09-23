@@ -27,6 +27,7 @@ from .score import (
     seasonal_sen_slope,
     seasonal_zp,
     sen_exact_limits,
+    gilbert_limits,
     sen_limits,
     tie_counts,
     sen_slope,
@@ -101,9 +102,12 @@ def _sen_fields(values: list[float], ordinary: float, corrected: float | None = 
         else:
             hlo, hhi = sen_limits(values, corrected)
     body = f"sen95={method} sen95_lo={lo} sen95_hi={hi}"
-    if hlo is None:
-        return body
-    return f"{body} hamed95_lo={hlo} hamed95_hi={hhi}"
+    if hlo is not None:
+        body = f"{body} hamed95_lo={hlo} hamed95_hi={hhi}"
+    if method == "normal":
+        glo, ghi = gilbert_limits(values, ordinary)
+        body = f"{body} gilbert95_lo={glo} gilbert95_hi={ghi}"
+    return body
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -45,6 +45,7 @@ from splitrecord.score import (  # noqa: E402
     seasonal_variance,
     exact_slope_ranks,
     sen_exact_limits,
+    gilbert_limits,
     sen_limits,
     pairwise_slopes,
     Z_95,
@@ -197,7 +198,7 @@ class CommandTests(unittest.TestCase):
         self.assertRegex(
             lines[0],
             r"^rows=12 residual=z\(A\)-z\(B\) theil_sen_z_per_row=\S+ "
-            r"sen95=normal sen95_lo=\S+ sen95_hi=\S+ hamed95_lo=\S+ hamed95_hi=\S+ "
+            r"sen95=normal sen95_lo=\S+ sen95_hi=\S+ hamed95_lo=\S+ hamed95_hi=\S+ gilbert95_lo=\S+ gilbert95_hi=\S+ "
             r"mann_kendall_S=-?\d+ tau=\S+ var=\S+ n_over_nstar=\S+ z=\S+ variance=hamed-rao p=\S+$",
         )
         s_token = next(part for part in lines[0].split() if part.startswith("mann_kendall_S="))
@@ -349,7 +350,7 @@ class PrewhitenTests(unittest.TestCase):
             line.stdout.strip(),
             r"^rows=12 residual=z\(A\)-z\(B\) series=trend-free-prewhiten "
             r"whitened_rows=11 removed_sen=\S+ r1=\S+ theil_sen_z_per_row=\S+ "
-            r"sen95=normal sen95_lo=\S+ sen95_hi=\S+ "
+            r"sen95=normal sen95_lo=\S+ sen95_hi=\S+ gilbert95_lo=\S+ gilbert95_hi=\S+ "
             r"mann_kendall_S=-?\d+ tau=\S+ var=\S+ z=\S+ variance=ordinary p=\S+$",
         )
         self.assertNotIn("hamed-rao", line.stdout)
@@ -374,7 +375,7 @@ class PrewhitenExampleTests(unittest.TestCase):
             line,
             "rows=9 residual=z(A)-z(B) series=trend-free-prewhiten "
             "whitened_rows=8 removed_sen=0.04892060565 r1=-0.888889 "
-            "theil_sen_z_per_row=0.04892060565 sen95=normal sen95_lo=0.02783875459 sen95_hi=0.0840570241 mann_kendall_S=22 "
+            "theil_sen_z_per_row=0.04892060565 sen95=normal sen95_lo=0.02783875459 sen95_hi=0.0840570241 gilbert95_lo=0.02950210971 gilbert95_hi=0.08294812068 mann_kendall_S=22 "
             "tau=0.7857142857 var=65.33333333 z=2.598076211 variance=ordinary p=0.00937477",
         )
         series = residual(
@@ -416,6 +417,29 @@ class MannKendallTests(unittest.TestCase):
 
 
 class SenLimitTests(unittest.TestCase):
+
+    def test_gilbert_interpolates_between_ranks(self) -> None:
+        series = [float(v) for v in (0, 1, 3, 2, 5, 4, 7, 6, 9, 8)]
+        slopes = pairwise_slopes(series)
+        var = mann_kendall_variance(len(series))
+        c = Z_95 * math.sqrt(var)
+        k = len(slopes)
+        m1 = (k - c) / 2.0
+        m2 = (k + c) / 2.0
+
+        def at(rank: float) -> float:
+            lower = math.floor(rank)
+            upper = math.ceil(rank)
+            left = slopes[lower - 1]
+            right = slopes[upper - 1]
+            return left + (right - left) * (rank - lower)
+
+        lo, hi = gilbert_limits(series, var)
+        self.assertEqual(lo, f"{at(m1):.10g}")
+        self.assertEqual(hi, f"{at(m2):.10g}")
+        self.assertEqual((lo, hi), ("0.6925461068", "1.153726947"))
+        self.assertEqual(gilbert_limits(series[:7], var), ("short", "short"))
+
 
     def test_sens_seven_point_series(self) -> None:
         values = [9.0, 15.0, 19.0, 20.0, 45.0, 55.0, 78.0]

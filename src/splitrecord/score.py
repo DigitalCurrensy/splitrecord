@@ -175,12 +175,13 @@ def sen_exact_limits(
 
 
 def sen_limits(values: Sequence[float], variance: float) -> tuple[str, str]:
-    """95% limits from the Gilbert (1987) ranks of the sorted slopes.
+    """95% limits from rounded ranks of the sorted slopes.
 
     C = Z_95 * sqrt(variance). With k slopes,
     rank_lo = round((k - C) / 2) and rank_up = round((k + C) / 2 + 1).
     Ranks are 1-based. A half rounds to even. The slopes at those ranks
     are the limits. This is the index rule used by the trend package.
+    It does not interpolate. gilbert_limits does.
 
     The caller chooses variance. The tie-corrected Mann-Kendall variance
     is Sen's interval. That same variance times the Hamed-Rao factor is
@@ -201,6 +202,46 @@ def sen_limits(values: Sequence[float], variance: float) -> tuple[str, str]:
     if rank_lo < 1 or rank_up > k or rank_lo > rank_up:
         return "wide", "wide"
     return f"{slopes[rank_lo - 1]:.10g}", f"{slopes[rank_up - 1]:.10g}"
+
+
+
+def gilbert_limits(values: Sequence[float], variance: float) -> tuple[str, str]:
+    """Interpolated 95% Sen interval.
+
+    C = Z_95 * sqrt(variance). With k slopes,
+    M1 = (k - C) / 2 and M2 = (k + C) / 2. Each limit is the straight
+    line between the slopes at floor(M) and ceiling(M). Ranks are 1-based.
+    An integer M is that one slope. This is the interpolation in the
+    mannkendall package, which cites Gilbert (1987). It is not a page
+    copied from that book, and it is not the rounded rank in sen_limits.
+
+    n < 8 returns ("short", "short"). A variance that is not positive
+    returns ("dependent", "dependent"). A rank outside 1..k returns
+    ("wide", "wide").
+    """
+    n = len(values)
+    if n < 8:
+        return "short", "short"
+    if not math.isfinite(variance) or variance <= 0.0:
+        return "dependent", "dependent"
+    slopes = pairwise_slopes(values)
+    k = len(slopes)
+    c = Z_95 * math.sqrt(variance)
+
+    def at(rank: float) -> float | None:
+        if rank < 1.0 or rank > k:
+            return None
+        lower = math.floor(rank)
+        upper = math.ceil(rank)
+        left = slopes[lower - 1]
+        right = slopes[upper - 1]
+        return left + (right - left) * (rank - lower)
+
+    lo = at((k - c) / 2.0)
+    hi = at((k + c) / 2.0)
+    if lo is None or hi is None:
+        return "wide", "wide"
+    return f"{lo:.10g}", f"{hi:.10g}"
 
 
 def mann_kendall(values: Sequence[float]) -> int:
