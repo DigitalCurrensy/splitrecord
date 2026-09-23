@@ -35,6 +35,10 @@ from splitrecord.score import (  # noqa: E402
     mann_kendall_p,
     mann_kendall_variance,
     residual,
+    seasonal_p,
+    seasonal_s,
+    seasonal_sen_slope,
+    seasonal_variance,
     sen_slope,
     tie_counts,
     zscores,
@@ -149,12 +153,14 @@ class ScoreTests(unittest.TestCase):
 class ReportTests(unittest.TestCase):
     def test_report_stays_under_80_and_checksums(self) -> None:
         rep = compile_report([1.0, 2.0, 3.0], [1.0, 1.5, 2.0])
-        self.assertEqual(rep["huc8"], "18030012")
         self.assertLessEqual(rep["words"], 80)
         self.assertEqual(rep["checksum"], fnv1a_32(rep["body"]))
         self.assertFalse(rep["fetched"])
+        self.assertEqual(rep["variance"], "hamed-rao")
         self.assertNotIn("certificate", rep["body"].lower())
+        self.assertNotIn("Tulare", rep["body"])
         self.assertIn("z(A) minus z(B)", rep["body"])
+        self.assertIn("variance Hamed-Rao", rep["body"])
 
 
 class CommandTests(unittest.TestCase):
@@ -178,9 +184,12 @@ class CommandTests(unittest.TestCase):
         self.assertNotIn("Traceback", proc.stderr)
         lines = proc.stdout.splitlines()
         self.assertEqual(len(lines), 1)
-        self.assertRegex(lines[0], r"^n=12 sen=\S+ S=-?\d+ p=\S+$")
-        self.assertIn("n=12", lines[0])
-        s_token = next(part for part in lines[0].split() if part.startswith("S="))
+        self.assertRegex(
+            lines[0],
+            r"^rows=12 residual=z\(A\)-z\(B\) theil_sen_z_per_row=\S+ "
+            r"mann_kendall_S=-?\d+ variance=hamed-rao p=\S+$",
+        )
+        s_token = next(part for part in lines[0].split() if part.startswith("mann_kendall_S="))
         s_value = int(s_token.split("=", 1)[1])
         self.assertNotEqual(s_value, 0)
 
@@ -205,6 +214,76 @@ class CommandTests(unittest.TestCase):
         err_lines = [line for line in proc.stderr.splitlines() if line]
         self.assertEqual(len(err_lines), 1)
         self.assertIn("malformed row", err_lines[0])
+
+
+
+class SeasonalTests(unittest.TestCase):
+    def test_same_season_only(self) -> None:
+        # Two seasons, three years, both rising: 1,1, 2,2, 3,3.
+        series = [1.0, 1.0, 2.0, 2.0, 3.0, 3.0]
+        self.assertEqual(seasonal_s(series, 2), 6)
+        one = 3 * 2 * 11 / 18
+        self.assertAlmostEqual(seasonal_variance(series, 2), 2 * one)
+        self.assertAlmostEqual(seasonal_variance(series, 2, covariance=True), 4 * one)
+        self.assertEqual(seasonal_sen_slope(series, 2), 1.0)
+        self.assertIsNone(seasonal_p(series, 2))
+
+    def test_opposite_seasons_cancel_in_the_covariance(self) -> None:
+        series = [1.0, 3.0, 2.0, 2.0, 3.0, 1.0]
+        self.assertEqual(seasonal_s(series, 2), 0)
+        self.assertAlmostEqual(seasonal_variance(series, 2, covariance=True), 0.0)
+
+    def test_uneven_table_refuses_covariance(self) -> None:
+        with self.assertRaises(ValueError) as ctx:
+            seasonal_variance([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0], 2, covariance=True)
+        self.assertEqual(str(ctx.exception), "uneven")
+
+    def test_hamed_rao_is_not_applied(self) -> None:
+        series = [float(i) for i in range(12)]
+        plain = mann_kendall_variance(6) * 2
+        self.assertEqual(seasonal_variance(series, 2), plain)
+        factor = hamed_rao_factor(series)
+        if factor != 1.0:
+            self.assertNotEqual(seasonal_variance(series, 2), plain * factor)
+
+    def test_bad_season(self) -> None:
+        with self.assertRaises(ValueError) as ctx:
+            seasonal_s([1.0, 2.0, 3.0, 4.0], 1)
+        self.assertEqual(str(ctx.exception), "bad season")
+
+
+
+
+class SeasonalCommandTests(unittest.TestCase):
+    def test_seasons_line_names_the_variance(self) -> None:
+        env = dict(os.environ, PYTHONPATH=str(SRC))
+        proc = subprocess.run(
+            [
+                sys.executable, "-m", "splitrecord",
+                str(ROOT / "examples" / "left.csv"),
+                str(ROOT / "examples" / "right.csv"),
+                "--seasons", "2",
+            ],
+            cwd=ROOT, env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        line = proc.stdout.strip()
+        self.assertRegex(
+            line,
+            r"^rows=12 residual=z\(A\)-z\(B\) seasons=2 "
+            r"theil_sen_z_per_year=\S+ seasonal_S=-?\d+ variance=seasonal p=\S+$",
+        )
+        cov = subprocess.run(
+            [
+                sys.executable, "-m", "splitrecord",
+                str(ROOT / "examples" / "left.csv"),
+                str(ROOT / "examples" / "right.csv"),
+                "--seasons", "2", "--covariance",
+            ],
+            cwd=ROOT, env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(cov.returncode, 0, cov.stderr)
+        self.assertIn("variance=hirsch-slack", cov.stdout)
 
 
 if __name__ == "__main__":

@@ -12,10 +12,28 @@ The p function is a normal approximation. It returns None when n < 8. The exact 
 
 Do not average the records. Do not fetch granules. Do not sign a permit.
 
-Copyright 2026 Digital Currensy Inc. License Apache-2.0. LICENSE is unmodified. Copyright notice is in NOTICE and the file headers.
+
+The printed line names every field.
+
+```
+rows=12 residual=z(A)-z(B) theil_sen_z_per_row=... mann_kendall_S=... variance=hamed-rao p=...
+```
+
+`variance=hamed-rao` means the tie-corrected variance was multiplied by the Hamed-Rao factor. That factor is for autocorrelation in one series. It does not remove a seasonal cycle. A January value is still compared with a July value. Under 8 rows, `p` is `short`. A non-positive corrected variance prints `p=dependent`.
+
+A seasonal test is a separate command. `--seasons N` says row 0 is season 0 of year 0, row 1 is season 1 of that year, and so on. A monthly file uses `--seasons 12`. S is the sum of the within-season Mann-Kendall counts. The Theil-Sen slope is pooled inside seasons, so the unit is z per year, not z per row. The variance is the sum of the seasonal variances. Hamed-Rao is not applied on top of it.
+
+```
+rows=12 residual=z(A)-z(B) seasons=2 theil_sen_z_per_year=... seasonal_S=... variance=seasonal p=...
+```
+
+`--covariance` replaces that variance with the Hirsch-Slack estimator. The off-diagonal term is (K + 4 * sum of rank products - n * (n+1)^2) / 3. It needs a complete table, one value for every season of every year. A short last year raises ValueError ("uneven"). The estimator allows months inside one year to move together. It does not correct a strong correlation from one year to the next. Hirsch and Slack reported that the test is not reliable for very persistent series, or for a record of about five years.
 
 ```
 pip install -e .
 python -m unittest tests.test_kernel
 python -m splitrecord examples/left.csv examples/right.csv
+python -m splitrecord examples/left.csv examples/right.csv --seasons 12
 ```
+
+Copyright 2026 Digital Currensy Inc. License Apache-2.0. LICENSE is unmodified. Copyright notice is in NOTICE and the file headers.

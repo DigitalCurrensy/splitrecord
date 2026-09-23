@@ -19,7 +19,15 @@ from __future__ import annotations
 import math
 import sys
 
-from .score import mann_kendall, mann_kendall_p, residual, sen_slope
+from .score import (
+    mann_kendall,
+    mann_kendall_p,
+    residual,
+    seasonal_p,
+    seasonal_s,
+    seasonal_sen_slope,
+    sen_slope,
+)
 
 
 def read_column(path: str) -> list[float]:
@@ -40,18 +48,64 @@ def read_column(path: str) -> list[float]:
     return values
 
 
+def _parse(args: list[str]) -> tuple[str, str, int | None, bool]:
+    files: list[str] = []
+    seasons: int | None = None
+    covariance = False
+    i = 0
+    while i < len(args):
+        token = args[i]
+        if token == "--seasons":
+            if i + 1 >= len(args):
+                raise ValueError("usage")
+            try:
+                seasons = int(args[i + 1])
+            except ValueError:
+                raise ValueError("bad season") from None
+            if seasons < 2:
+                raise ValueError("bad season")
+            i += 2
+            continue
+        if token == "--covariance":
+            covariance = True
+            i += 1
+            continue
+        files.append(token)
+        i += 1
+    if len(files) != 2 or (covariance and seasons is None):
+        raise ValueError("usage")
+    return files[0], files[1], seasons, covariance
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
-    if len(args) != 2:
-        print("usage: python -m splitrecord LEFT.csv RIGHT.csv", file=sys.stderr)
-        return 2
     try:
-        left = read_column(args[0])
-        right = read_column(args[1])
-        series = residual(left, right)
-        slope = sen_slope(series)
-        s = mann_kendall(series)
-        p = mann_kendall_p(series)
+        left_path, right_path, seasons, covariance = _parse(args)
+    except ValueError as exc:
+        if str(exc) == "usage":
+            print(
+                "usage: python -m splitrecord LEFT.csv RIGHT.csv [--seasons N] [--covariance]",
+                file=sys.stderr,
+            )
+            return 2
+        print(exc, file=sys.stderr)
+        return 1
+    try:
+        series = residual(read_column(left_path), read_column(right_path))
+        if seasons is None:
+            slope = sen_slope(series)
+            s = mann_kendall(series)
+            p = mann_kendall_p(series)
+            variance = "hamed-rao"
+            slope_key = "theil_sen_z_per_row"
+            s_key = "mann_kendall_S"
+        else:
+            slope = seasonal_sen_slope(series, seasons)
+            s = seasonal_s(series, seasons)
+            p = seasonal_p(series, seasons, covariance=covariance)
+            variance = "hirsch-slack" if covariance else "seasonal"
+            slope_key = "theil_sen_z_per_year"
+            s_key = "seasonal_S"
     except (OSError, UnicodeError, ValueError) as exc:
         print(exc, file=sys.stderr)
         return 1
@@ -61,7 +115,11 @@ def main(argv: list[str] | None = None) -> int:
         p_text = "dependent"
     else:
         p_text = f"{p:.6g}"
-    print(f"n={len(series)} sen={slope:.10g} S={s} p={p_text}")
+    season_text = "" if seasons is None else f" seasons={seasons}"
+    print(
+        f"rows={len(series)} residual=z(A)-z(B){season_text} "
+        f"{slope_key}={slope:.10g} {s_key}={s} variance={variance} p={p_text}"
+    )
     return 0
 
 

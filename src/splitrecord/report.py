@@ -12,16 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Cite and checksum. No granules. Counsel stays unsigned."""
+"""One labeled summary of the residual."""
 
 from __future__ import annotations
 
-from .score import mann_kendall, residual, sen_slope
+from .score import mann_kendall, mann_kendall_p, residual, sen_slope
 
-OFFER = "Unsigned. Not an invoice."
 WORD_CAP = 80
-HUC8 = "18030012"
-BASIN = "Tulare Lake"
 
 
 def fnv1a_32(text: str) -> str:
@@ -36,21 +33,27 @@ def compile_report(left: list[float], right: list[float]) -> dict:
     r = residual(left, right)
     slope = sen_slope(r)
     s = mann_kendall(r)
+    p = mann_kendall_p(r)
+    if len(r) < 8:
+        p_text = "short"
+    elif p is None:
+        p_text = "dependent"
+    else:
+        p_text = f"{p:.6g}"
     body = (
-        f"SPLITRECORD. {BASIN} HUC8 {HUC8}. Residual is z(A) minus z(B). "
-        f"Sen {slope:.4f}. Mann-Kendall S {s}. "
-        "S is a count, not a significance test. "
-        "No granules. Not NASA-endorsed. Counsel unsigned."
+        f"Residual is z(A) minus z(B). rows {len(r)}. "
+        f"Theil-Sen {slope:.4f} z per row. "
+        f"Mann-Kendall S {s}. variance Hamed-Rao. p {p_text}."
     )
     words = len(body.split())
     return {
-        "basin": BASIN,
-        "huc8": HUC8,
+        "rows": len(r),
         "sen": slope,
         "mk": s,
+        "variance": "hamed-rao",
+        "p": p_text,
         "checksum": fnv1a_32(body),
         "body": body,
         "words": words,
-        "offer": OFFER,
         "fetched": False,
     }

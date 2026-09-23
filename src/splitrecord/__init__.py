@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""SPLITRECORD — when two official records disagree, that disagreement is the product."""
+"""Theil-Sen slope and Mann-Kendall test of z(A) minus z(B)."""
 
 from .report import compile_report, fnv1a_32
 from .score import (
@@ -20,6 +20,10 @@ from .score import (
     mann_kendall_p,
     mann_kendall_variance,
     residual,
+    seasonal_p,
+    seasonal_s,
+    seasonal_sen_slope,
+    seasonal_variance,
     sen_slope,
     zscores,
 )
@@ -31,6 +35,10 @@ __all__ = [
     "mann_kendall_p",
     "mann_kendall_variance",
     "residual",
+    "seasonal_p",
+    "seasonal_s",
+    "seasonal_sen_slope",
+    "seasonal_variance",
     "sen_slope",
     "zscores",
 ]

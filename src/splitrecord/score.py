@@ -255,3 +255,120 @@ def mann_kendall_p(values: Sequence[float]) -> float | None:
     sign = (s > 0) - (s < 0)
     z = (s - sign) / math.sqrt(var)
     return math.erfc(abs(z) / math.sqrt(2))
+
+
+def season_groups(values: Sequence[float], period: int) -> list[list[float]]:
+    """Split a chronological series into seasons.
+
+    Row 0 is season 0 of the first year. Row 1 is season 1 of that same year.
+    A monthly file is January, February, and so on, then January again.
+    period must be >= 2. A non-finite value raises ValueError("bad number").
+    """
+    if period < 2:
+        raise ValueError("bad season")
+    _finite(values)
+    groups: list[list[float]] = [[] for _ in range(period)]
+    for index, value in enumerate(values):
+        groups[index % period].append(float(value))
+    return groups
+
+
+def seasonal_s(values: Sequence[float], period: int) -> int:
+    """Seasonal Mann-Kendall S. Sum of the within-season S values.
+
+    Each season is compared only with later rows of the same season.
+    A different season is not a pair. Requires at least two years,
+    meaning len(values) >= 2 * period. Otherwise ValueError("not enough").
+    """
+    if len(values) < 2 * period:
+        raise ValueError("not enough")
+    return sum(mann_kendall(group) for group in season_groups(values, period))
+
+
+def seasonal_sen_slope(values: Sequence[float], period: int) -> float:
+    """Theil-Sen slope pooled inside seasons. Unit is z per year-step.
+
+    Pairwise slopes are formed only inside one season. The denominator is
+    the year gap, not the row gap. The result is the median of that pool.
+    An even count averages the two middle slopes. Requires two years.
+    """
+    if len(values) < 2 * period:
+        raise ValueError("not enough")
+    slopes: list[float] = []
+    for group in season_groups(values, period):
+        n = len(group)
+        for i in range(n):
+            for j in range(i + 1, n):
+                slopes.append((group[j] - group[i]) / (j - i))
+    if not slopes:
+        raise ValueError("not enough")
+    slopes.sort()
+    m = len(slopes)
+    if m % 2:
+        return slopes[m // 2]
+    return 0.5 * (slopes[m // 2 - 1] + slopes[m // 2])
+
+
+def seasonal_variance(values: Sequence[float], period: int, covariance: bool = False) -> float:
+    """Variance of seasonal Mann-Kendall S.
+
+    covariance False is Hirsch, Slack, and Smith (1982): the sum of the
+    tie-corrected variances of the seasons. Seasons are treated as independent.
+    Hamed-Rao is not applied. Those are different corrections.
+
+    covariance True is Hirsch and Slack (1984). Off-diagonal terms are the
+    Dietz and Killeen estimator
+
+        (K_gh + 4 * sum_i R_ig * R_ih - n * (n + 1)^2) / 3
+
+    K_gh is the sum of sign products between the two seasons across years.
+    R is the within-season rank, ties sharing the average rank. The diagonal
+    stays the ordinary tie-corrected variance. This form needs a complete
+    years-by-seasons table. If len(values) is not a multiple of period,
+    raise ValueError("uneven"). The estimator assumes dependence inside a
+    year, not a strong correlation from one year to the next.
+    """
+    if len(values) < 2 * period:
+        raise ValueError("not enough")
+    groups = season_groups(values, period)
+    if not covariance:
+        return sum(mann_kendall_variance(len(group), tie_counts(group)) for group in groups)
+    if len(values) % period != 0:
+        raise ValueError("uneven")
+    years = len(values) // period
+    ranks = [average_ranks(group) for group in groups]
+    total = 0.0
+    for g in range(period):
+        for h in range(period):
+            if g == h:
+                total += mann_kendall_variance(years, tie_counts(groups[g]))
+                continue
+            k = 0
+            for i in range(years - 1):
+                for j in range(i + 1, years):
+                    dg = groups[g][j] - groups[g][i]
+                    dh = groups[h][j] - groups[h][i]
+                    sg = 1 if dg > 0 else -1 if dg < 0 else 0
+                    sh = 1 if dh > 0 else -1 if dh < 0 else 0
+                    k += sg * sh
+            sum_rr = sum(ranks[g][i] * ranks[h][i] for i in range(years))
+            total += (k + 4.0 * sum_rr - years * (years + 1) ** 2) / 3.0
+    return total
+
+
+def seasonal_p(values: Sequence[float], period: int, covariance: bool = False) -> float | None:
+    """Two-sided normal approximation to seasonal S.
+
+    Returns None when len(values) < 8, or when the variance is not positive.
+    z = (S - sign(S)) / sqrt(var). p = erfc(|z| / sqrt(2)).
+    The Hamed-Rao factor is not multiplied in.
+    """
+    if len(values) < 8:
+        return None
+    var = seasonal_variance(values, period, covariance=covariance)
+    if var <= 0.0:
+        return None
+    s = seasonal_s(values, period)
+    sign = (s > 0) - (s < 0)
+    z = (s - sign) / math.sqrt(var)
+    return math.erfc(abs(z) / math.sqrt(2))
