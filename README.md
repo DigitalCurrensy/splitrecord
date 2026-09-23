@@ -4,8 +4,6 @@ For a hydrologist who already holds two official records of one basin and cannot
 
 **Owner:** Digital Currensy Inc.
 **License:** Apache-2.0. Our code only. Cited data and papers stay with their authors.
-**Status:** Private until the owner publishes it.
-
 ## What it decides
 
 Split, or no split. The residual is the result.

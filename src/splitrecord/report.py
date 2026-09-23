@@ -1,10 +1,10 @@
-"""Cite + FNV checksum + paid report. Field-locked briefs. No granules."""
+"""Cite and checksum. No granules. Counsel stays unsigned."""
 
 from __future__ import annotations
 
 from .score import mann_kendall, residual, sen_slope
 
-OFFER = "paid report $4k–$12k. Not an invoice."
+OFFER = "Unsigned. Not an invoice."
 WORD_CAP = 80
 HUC8 = "18030012"
 BASIN = "Tulare Lake"
