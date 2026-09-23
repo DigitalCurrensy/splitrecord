@@ -31,6 +31,7 @@ def zscores(values: Sequence[float]) -> list[float]:
     n = len(values)
     if n < 2:
         raise ValueError("not enough")
+    _finite(values)
     mean = sum(values) / n
     variance = sum((x - mean) ** 2 for x in values) / (n - 1)
     if variance == 0.0:
@@ -58,6 +59,7 @@ def residual(a: Sequence[float], b: Sequence[float]) -> list[float]:
 def sen_slope(values: Sequence[float]) -> float:
     """Median pairwise slope. Requires at least two points."""
     n = len(values)
+    _finite(values)
     slopes = []
     for i in range(n):
         for j in range(i + 1, n):
@@ -78,6 +80,7 @@ def mann_kendall(values: Sequence[float]) -> int:
     S counts the sign of later minus earlier over every pair. Ties add
     nothing. S is a count, not a p-value and not a significance test.
     """
+    _finite(values)
     s = 0
     n = len(values)
     for i in range(n):
@@ -168,33 +171,35 @@ def detrend(values: Sequence[float]) -> list[float]:
     return [float(value) - slope * index for index, value in enumerate(values)]
 
 
-def rank_autocorr(ranks: Sequence[float], lag: int) -> float:
-    """Pearson correlation of ranks[:-lag] with ranks[lag:].
+def _finite(values: Sequence[float]) -> None:
+    for value in values:
+        if not math.isfinite(value):
+            raise ValueError("bad number")
 
-    If either side has no variation, return 0.0. Clamp to [-0.999, 0.999].
+
+def rank_autocorr(ranks: Sequence[float], lag: int) -> float:
+    """Autocorrelation of ranks at one lag.
+
+    One mean, taken over the whole rank series. The numerator is the sum of
+    (rank_t - mean) * (rank_{t+lag} - mean) for t = 1..n-lag. The denominator
+    is the sum of (rank_t - mean)^2 over the whole series. That is the
+    autocorrelation in Hamed and Rao, not a Pearson correlation of the two
+    windows. No variation returns 0. The result is clamped to [-0.999, 0.999].
     """
     n = len(ranks)
     if lag <= 0 or lag >= n:
         return 0.0
-    left = ranks[:-lag]
-    right = ranks[lag:]
-    m = len(left)
-    if m == 0:
+    mean = sum(ranks) / n
+    denom = 0.0
+    for rank in ranks:
+        d = rank - mean
+        denom += d * d
+    if denom == 0.0:
         return 0.0
-    mean_left = sum(left) / m
-    mean_right = sum(right) / m
-    cov = 0.0
-    var_left = 0.0
-    var_right = 0.0
-    for a, b in zip(left, right):
-        da = a - mean_left
-        db = b - mean_right
-        cov += da * db
-        var_left += da * da
-        var_right += db * db
-    if var_left == 0.0 or var_right == 0.0:
-        return 0.0
-    r = cov / math.sqrt(var_left * var_right)
+    numer = 0.0
+    for t in range(n - lag):
+        numer += (ranks[t] - mean) * (ranks[t + lag] - mean)
+    r = numer / denom
     if r > 0.999:
         return 0.999
     if r < -0.999:
@@ -207,7 +212,7 @@ def hamed_rao_factor(values: Sequence[float]) -> float:
 
     If n < 3, return 1.0. Otherwise detrend with Sen's slope, rank that
     series, and for every lag i from 1 through n-1 compute the rank
-    autocorrelation. Keep rho only when abs(rho) > 1.95996398454 / sqrt(n);
+    autocorrelation. rho is the full-series autocorrelation defined in rank_autocorr. Keep rho only when abs(rho) > 1.95996398454 / sqrt(n);
     otherwise treat that lag as 0. The threshold is the two-sided 5% normal
     bound. The factor is
 

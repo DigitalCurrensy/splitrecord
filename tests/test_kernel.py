@@ -30,6 +30,7 @@ if str(SRC) not in sys.path:
 from splitrecord.report import compile_report, fnv1a_32  # noqa: E402
 from splitrecord.score import (  # noqa: E402
     hamed_rao_factor,
+    rank_autocorr,
     mann_kendall,
     mann_kendall_p,
     mann_kendall_variance,
@@ -80,6 +81,11 @@ class ScoreTests(unittest.TestCase):
         slope = sen_slope([1.0, 2.0, 4.0])
         self.assertGreater(slope, 0)
         self.assertEqual(slope, 1.5)
+        # Four points, six slopes: 1, 1, 1, 5/3, 2, 3. Even count, so the
+        # median is the mean of the two middle slopes, 1 and 5/3.
+        even = sen_slope([1.0, 2.0, 3.0, 6.0])
+        self.assertAlmostEqual(even, (1.0 + 5.0 / 3.0) / 2.0)
+
 
     def test_mann_kendall_s_sign(self) -> None:
         self.assertEqual(mann_kendall([1.0, 2.0, 4.0]), 3)
@@ -115,6 +121,12 @@ class ScoreTests(unittest.TestCase):
         repeats = [5.0, 5.0, 5.0, 0.0] * 3
         self.assertEqual(len(repeats), 12)
         self.assertGreater(hamed_rao_factor(repeats), 1.0)
+        # ranks 1,2,3,4. mean 2.5. denom 5. lag-1 numerator 1.25. rho 0.25.
+        self.assertAlmostEqual(rank_autocorr([1.0, 2.0, 3.0, 4.0], 1), 0.25)
+        with self.assertRaises(ValueError) as ctx:
+            sen_slope([1.0, float("nan")])
+        self.assertEqual(str(ctx.exception), "bad number")
+
         wobble = [0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
         p_flat = mann_kendall_p(wobble)
         self.assertIsNotNone(p_flat)
