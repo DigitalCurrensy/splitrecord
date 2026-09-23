@@ -16,6 +16,7 @@
 
 from .report import compile_report, fnv1a_32
 from .score import (
+    kendall_tau,
     mann_kendall,
     mann_kendall_p,
     mann_kendall_p_ordinary,
@@ -33,6 +34,7 @@ from .score import (
 __all__ = [
     "compile_report",
     "fnv1a_32",
+    "kendall_tau",
     "mann_kendall",
     "mann_kendall_p",
     "mann_kendall_variance",

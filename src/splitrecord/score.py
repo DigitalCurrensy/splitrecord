@@ -231,27 +231,60 @@ def hamed_rao_factor(values: Sequence[float]) -> float:
     return 1.0 + (2.0 / (n * (n - 1) * (n - 2))) * total
 
 
-def mann_kendall_p(values: Sequence[float]) -> float | None:
-    """Two-sided normal approximation to Mann-Kendall S.
+def kendall_tau(values: Sequence[float]) -> float | None:
+    """Kendall's tau-b.
 
-    Returns None when n < 8. var is the tie-corrected Mann-Kendall variance
-    multiplied by the Hamed-Rao factor over every lag. If that corrected
-    variance is not positive, return None. A clean straight line has no
-    leftover rank correlation after Sen detrending, so the factor is 1 and
-    p is the ordinary normal approximation. Then
-    z = (S - sign(S)) / sqrt(var), with sign 0 when S is 0, and
-    p = erfc(|z| / sqrt(2)). This p-value is not a certificate.
+    The row index has no ties, so
+
+        tau = S / sqrt( (n(n-1)/2 - sum t(t-1)/2) * n(n-1)/2 )
+
+    The sum is over tie-group sizes t > 1. None means every value is tied,
+    so the denominator is 0. Tau is not a p-value.
     """
     n = len(values)
-    if n < 8:
+    if n < 2:
+        raise ValueError("not enough")
+    _finite(values)
+    n0 = n * (n - 1) / 2.0
+    tie_pairs = sum(t * (t - 1) / 2.0 for t in tie_counts(values))
+    comparable = n0 - tie_pairs
+    if comparable <= 0.0:
         return None
+    return mann_kendall(values) / math.sqrt(comparable * n0)
+
+
+def mann_kendall_z(
+    values: Sequence[float], *, hamed: bool = True
+) -> tuple[int, float | None, float, float, float | None, float | None]:
+    """Return S, tau, corrected variance, n/n*, z, and p.
+
+    n/n* is the Hamed-Rao factor when hamed is true, otherwise 1.
+    The corrected variance is the tie-corrected variance times that factor.
+    z and p are None when n < 8 or the corrected variance is not positive.
+    z = (S - sign(S)) / sqrt(var), and sign is 0 when S is 0.
+    p = erfc(|z| / sqrt(2)). Yue and Wang's lag-1 formula is not this factor.
+    """
+    n = len(values)
     s = mann_kendall(values)
-    var = mann_kendall_variance(n, tie_counts(values)) * hamed_rao_factor(values)
-    if var <= 0.0:
-        return None
+    tau = kendall_tau(values) if n >= 2 else None
+    base = mann_kendall_variance(n, tie_counts(values))
+    factor = hamed_rao_factor(values) if hamed else 1.0
+    var = base * factor
+    if n < 8 or var <= 0.0:
+        return s, tau, var, factor, None, None
     sign = (s > 0) - (s < 0)
     z = (s - sign) / math.sqrt(var)
-    return math.erfc(abs(z) / math.sqrt(2))
+    p = math.erfc(abs(z) / math.sqrt(2.0))
+    return s, tau, var, factor, z, p
+
+
+def mann_kendall_p(values: Sequence[float]) -> float | None:
+    """Two-sided p from mann_kendall_z with the Hamed-Rao factor.
+
+    Returns None when n < 8 or the corrected variance is not positive.
+    This p-value is not a certificate.
+    """
+    return mann_kendall_z(values, hamed=True)[5]
 
 
 def season_groups(values: Sequence[float], period: int) -> list[list[float]]:
@@ -353,40 +386,32 @@ def seasonal_variance(values: Sequence[float], period: int, covariance: bool = F
     return total
 
 
-def seasonal_p(values: Sequence[float], period: int, covariance: bool = False) -> float | None:
-    """Two-sided normal approximation to seasonal S.
+def seasonal_zp(
+    values: Sequence[float], period: int, covariance: bool = False
+) -> tuple[float | None, float | None, float]:
+    """Return z, p, and the seasonal variance.
 
-    Returns None when len(values) < 8, or when the variance is not positive.
-    z = (S - sign(S)) / sqrt(var). p = erfc(|z| / sqrt(2)).
+    z and p are None when len(values) < 8 or the variance is not positive.
     The Hamed-Rao factor is not multiplied in.
     """
-    if len(values) < 8:
-        return None
     var = seasonal_variance(values, period, covariance=covariance)
-    if var <= 0.0:
-        return None
+    if len(values) < 8 or var <= 0.0:
+        return None, None, var
     s = seasonal_s(values, period)
     sign = (s > 0) - (s < 0)
     z = (s - sign) / math.sqrt(var)
-    return math.erfc(abs(z) / math.sqrt(2))
+    p = math.erfc(abs(z) / math.sqrt(2.0))
+    return z, p, var
+
+
+def seasonal_p(values: Sequence[float], period: int, covariance: bool = False) -> float | None:
+    """Two-sided p from seasonal_zp. None when the normal approximation is refused."""
+    return seasonal_zp(values, period, covariance=covariance)[1]
 
 
 def mann_kendall_p_ordinary(values: Sequence[float]) -> float | None:
-    """Two-sided Mann-Kendall p with the tie-corrected variance only.
-
-    The Hamed-Rao factor is not applied. Returns None when n < 8 or the
-    variance is not positive. z = (S - sign(S)) / sqrt(var).
-    """
-    n = len(values)
-    if n < 8:
-        return None
-    s = mann_kendall(values)
-    var = mann_kendall_variance(n, tie_counts(values))
-    if var <= 0.0:
-        return None
-    sign = (s > 0) - (s < 0)
-    z = (s - sign) / math.sqrt(var)
-    return math.erfc(abs(z) / math.sqrt(2))
+    """Two-sided p from mann_kendall_z with no Hamed-Rao factor."""
+    return mann_kendall_z(values, hamed=False)[5]
 
 
 def trend_free_prewhiten(values: Sequence[float]) -> tuple[list[float], float, float]:

@@ -30,6 +30,8 @@ if str(SRC) not in sys.path:
 from splitrecord.report import compile_report, fnv1a_32  # noqa: E402
 from splitrecord.score import (  # noqa: E402
     hamed_rao_factor,
+    kendall_tau,
+    mann_kendall_z,
     rank_autocorr,
     mann_kendall,
     mann_kendall_p,
@@ -190,7 +192,7 @@ class CommandTests(unittest.TestCase):
         self.assertRegex(
             lines[0],
             r"^rows=12 residual=z\(A\)-z\(B\) theil_sen_z_per_row=\S+ "
-            r"mann_kendall_S=-?\d+ variance=hamed-rao p=\S+$",
+            r"mann_kendall_S=-?\d+ tau=\S+ var=\S+ n_over_nstar=\S+ z=\S+ variance=hamed-rao p=\S+$",
         )
         s_token = next(part for part in lines[0].split() if part.startswith("mann_kendall_S="))
         s_value = int(s_token.split("=", 1)[1])
@@ -274,7 +276,7 @@ class SeasonalCommandTests(unittest.TestCase):
         self.assertRegex(
             line,
             r"^rows=12 residual=z\(A\)-z\(B\) seasons=2 "
-            r"theil_sen_z_per_year=\S+ seasonal_S=-?\d+ variance=seasonal p=\S+$",
+            r"theil_sen_z_per_year=\S+ seasonal_S=-?\d+ var=\S+ z=\S+ variance=seasonal p=\S+$",
         )
         cov = subprocess.run(
             [
@@ -341,7 +343,7 @@ class PrewhitenTests(unittest.TestCase):
             line.stdout.strip(),
             r"^rows=12 residual=z\(A\)-z\(B\) series=trend-free-prewhiten "
             r"whitened_rows=11 removed_sen=\S+ r1=\S+ theil_sen_z_per_row=\S+ "
-            r"mann_kendall_S=-?\d+ variance=ordinary p=\S+$",
+            r"mann_kendall_S=-?\d+ tau=\S+ var=\S+ z=\S+ variance=ordinary p=\S+$",
         )
         self.assertNotIn("hamed-rao", line.stdout)
 
@@ -366,7 +368,7 @@ class PrewhitenExampleTests(unittest.TestCase):
             "rows=9 residual=z(A)-z(B) series=trend-free-prewhiten "
             "whitened_rows=8 removed_sen=0.04892060565 r1=-0.888889 "
             "theil_sen_z_per_row=0.04892060565 mann_kendall_S=22 "
-            "variance=ordinary p=0.00937477",
+            "tau=0.7857142857 var=65.33333333 z=2.598076211 variance=ordinary p=0.00937477",
         )
         series = residual(
             [float(v) for v in (ROOT / "examples" / "pw_left.csv").read_text().split()],
@@ -382,6 +384,27 @@ class PrewhitenExampleTests(unittest.TestCase):
         median = 0.5 * (slopes[17] + slopes[18])
         self.assertAlmostEqual(median, sen_slope(series))
         self.assertIn(f"removed_sen={median:.10g}", line)
+
+
+
+class MannKendallTests(unittest.TestCase):
+    def test_tau_b(self) -> None:
+        self.assertEqual(kendall_tau([1.0, 2.0, 3.0, 4.0]), 1.0)
+        self.assertIsNone(kendall_tau([5.0, 5.0, 5.0, 5.0]))
+        self.assertAlmostEqual(kendall_tau([1.0, 1.0, 2.0]), 2.0 / math.sqrt(6.0))
+
+    def test_hamed_rao_scales_the_variance(self) -> None:
+        series = [5.0, 5.0, 5.0, 0.0] * 3
+        s, tau, var, factor, z, p = mann_kendall_z(series, hamed=True)
+        ordinary = mann_kendall_variance(len(series), tie_counts(series))
+        self.assertEqual(s, -9)
+        self.assertGreater(factor, 1.0)
+        self.assertAlmostEqual(factor, 1.3393939393939394)
+        self.assertAlmostEqual(var, ordinary * factor)
+        self.assertAlmostEqual(z, (s + 1) / math.sqrt(var))
+        self.assertAlmostEqual(p, math.erfc(abs(z) / math.sqrt(2.0)))
+        straight = mann_kendall_z([float(i) for i in range(10)], hamed=True)
+        self.assertEqual(straight[3], 1.0)
 
 
 if __name__ == "__main__":

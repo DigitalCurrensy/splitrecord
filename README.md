@@ -8,6 +8,8 @@ The size of the drift is the Theil-Sen slope, also called Sen's slope. It is the
 
 mann_kendall returns S only. S is up steps minus down steps. A tie adds nothing. S is a count, not a slope and not a p-value.
 
+Kendall's tau-b is S divided by the square root of (n(n-1)/2 - sum t(t-1)/2) times n(n-1)/2. The sum is over tie groups. The row index has no ties. If every value is tied, the line prints tau=tied.
+
 The p function is a normal approximation. It returns None when n < 8. The exact small-sample distribution is not computed. With no ties, var = n(n-1)(2n+5)/18. For each tie group of size t > 1, subtract t(t-1)(2t+5)/18. That variance is then multiplied by the Hamed-Rao factor, which is n/n*. If n < 3, the factor is 1. Otherwise the series is detrended by subtracting Sen's slope times the index, and the detrended series is ranked. Ties share the average rank. Ranks start at 1. For every lag i from 1 through n-1, rho uses one mean of the whole rank series. The numerator sums (rank_t - mean) times (rank_t+i - mean). The denominator sums (rank_t - mean) squared over every rank. If the ranks do not vary, rho is 0. Rho is clamped to [-0.999, 0.999]. Rho is kept only when abs(rho) is greater than 1.95996398454/sqrt(n). Otherwise that lag is treated as 0. The threshold is the two-sided 5% normal bound. The factor is 1 + (2 / (n*(n-1)*(n-2))) times the sum over every lag i of (n-i)*(n-i-1)*(n-i-2)*rho_i. The sum is over every lag, not a single lag and not a cap at 3. If the corrected variance is not positive, p is None. The continuity correction is z = (S - sign(S)) / sqrt(var), and sign is 0 when S is 0. p = erfc(|z| / sqrt(2)). This p is not a certificate. The worked file is not a basin study.
 
 Do not average the records. Do not fetch granules. Do not sign a permit.
@@ -16,8 +18,10 @@ Do not average the records. Do not fetch granules. Do not sign a permit.
 The printed line names every field.
 
 ```
-rows=12 residual=z(A)-z(B) theil_sen_z_per_row=... mann_kendall_S=... variance=hamed-rao p=...
+rows=12 residual=z(A)-z(B) theil_sen_z_per_row=0.5547001962 mann_kendall_S=66 tau=1 var=212.6666667 n_over_nstar=1 z=4.457215629 variance=hamed-rao p=8.30311e-06
 ```
+
+`var` is the tie-corrected variance times `n_over_nstar`. `z` is (S - sign(S)) / sqrt(var). `p` is erfc(|z| / sqrt(2)). On this file the factor is 1: after the Sen slope is removed, the ranks do not vary, so no lag is kept. A repeating series is different. For `5, 5, 5, 0` repeated three times, S is -9, the ordinary variance is 117, `n_over_nstar` is 1.339393939, and `var` is 156.7090909. Yue and Wang's lag-1-only factor is not this number. The sum still runs over every lag.
 
 `variance=hamed-rao` means the tie-corrected variance was multiplied by the Hamed-Rao factor. That factor is for autocorrelation in one series. It does not remove a seasonal cycle. A January value is still compared with a July value. Under 8 rows, `p` is `short`. A non-positive corrected variance prints `p=dependent`.
 
@@ -51,7 +55,7 @@ python -m splitrecord examples/pw_left.csv examples/pw_right.csv --prewhiten
 ```
 
 ```
-rows=9 residual=z(A)-z(B) series=trend-free-prewhiten whitened_rows=8 removed_sen=0.04892060565 r1=-0.888889 theil_sen_z_per_row=0.04892060565 mann_kendall_S=22 variance=ordinary p=0.00937477
+rows=9 residual=z(A)-z(B) series=trend-free-prewhiten whitened_rows=8 removed_sen=0.04892060565 r1=-0.888889 theil_sen_z_per_row=0.04892060565 mann_kendall_S=22 tau=0.7857142857 var=65.33333333 z=2.598076211 variance=ordinary p=0.00937477
 ```
 
 `removed_sen` is the slope that was taken off. `theil_sen_z_per_row` is the Sen slope of the blended series. They match in this file. They do not match in every file. `variance=ordinary` is not Hamed-Rao.
