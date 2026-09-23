@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import math
 import os
 import subprocess
 import sys
@@ -34,6 +33,7 @@ from splitrecord.score import (  # noqa: E402
     mann_kendall_variance,
     residual,
     sen_slope,
+    tie_counts,
     zscores,
 )
 
@@ -87,23 +87,21 @@ class ScoreTests(unittest.TestCase):
     def test_p_none_when_short(self) -> None:
         self.assertIsNone(mann_kendall_p([1.0, 2.0, 3.0]))
         self.assertIsNone(mann_kendall_p([float(i) for i in range(7)]))
-        self.assertIsNotNone(mann_kendall_p([float(i) for i in range(8)]))
+        self.assertIsNone(mann_kendall_p(list(range(8))))
 
     def test_p_long_series(self) -> None:
-        increasing = [float(i) for i in range(10)]
-        p_up = mann_kendall_p(increasing)
-        self.assertIsNotNone(p_up)
-        assert p_up is not None
-        self.assertGreaterEqual(p_up, 0.0)
-        self.assertLessEqual(p_up, 1.0)
-        self.assertLess(p_up, 0.05)
-        # Hand check of the normal approximation, not a call back into the helper.
-        s = 10 * 9 // 2
-        var = 10 * 9 * (2 * 10 + 5) / 18
-        z = (s - 1) / math.sqrt(var)
-        self.assertLess(abs(p_up - math.erfc(abs(z) / math.sqrt(2))), 1e-12)
-        self.assertEqual(mann_kendall_variance(10), var)
-        # Alternating series: no monotonic pattern.
+        self.assertEqual(mann_kendall_variance(10), 10 * 9 * (20 + 5) / 18)
+        repeated = [1.0, 1.0, 1.0, 2.0, 3.0, 4.0]
+        bare = mann_kendall_variance(len(repeated))
+        term = 3 * (3 - 1) * (2 * 3 + 5) / 18
+        corrected = mann_kendall_variance(len(repeated), tie_counts(repeated))
+        self.assertEqual(tie_counts(repeated), [3])
+        self.assertEqual(corrected, bare - term)
+        self.assertLess(corrected, bare)
+        # A straight line is dependent.
+        self.assertIsNone(mann_kendall_p(list(range(8))))
+        self.assertIsNone(mann_kendall_p(list(range(10))))
+        # Alternating series: lag-1 is negative, so the variance is not deflated.
         wobble = [0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
         p_flat = mann_kendall_p(wobble)
         self.assertIsNotNone(p_flat)
@@ -155,7 +153,7 @@ class CommandTests(unittest.TestCase):
         self.assertNotIn("Traceback", proc.stderr)
         lines = proc.stdout.splitlines()
         self.assertEqual(len(lines), 1)
-        self.assertRegex(lines[0], r"^n=12 sen=\S+ S=-?\d+ p=(short|\d)")
+        self.assertRegex(lines[0], r"^n=12 sen=\S+ S=-?\d+ p=dependent$")
         self.assertIn("n=12", lines[0])
         s_token = next(part for part in lines[0].split() if part.startswith("S="))
         s_value = int(s_token.split("=", 1)[1])

@@ -55,7 +55,12 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, UnicodeError, ValueError) as exc:
         print(exc, file=sys.stderr)
         return 1
-    p_text = "short" if p is None else f"{p:.6g}"
+    if len(series) < 8:
+        p_text = "short"
+    elif p is None:
+        p_text = "dependent"
+    else:
+        p_text = f"{p:.6g}"
     print(f"n={len(series)} sen={slope:.10g} S={s} p={p_text}")
     return 0
 

@@ -87,25 +87,82 @@ def mann_kendall(values: Sequence[float]) -> int:
     return s
 
 
-def mann_kendall_variance(n: int) -> float:
-    """Variance of Mann-Kendall S with no tie correction: n(n-1)(2n+5)/18."""
-    return n * (n - 1) * (2 * n + 5) / 18
+def mann_kendall_variance(n: int, ties: Sequence[int] = ()) -> float:
+    """Variance of Mann-Kendall S.
+
+    With no ties, var = n(n-1)(2n+5)/18. For each tie-group size t > 1,
+    subtract t(t-1)(2t+5)/18. A call with only n is that no-tie formula.
+    """
+    var = n * (n - 1) * (2 * n + 5) / 18
+    for t in ties:
+        if t > 1:
+            var -= t * (t - 1) * (2 * t + 5) / 18
+    return var
+
+
+def tie_counts(values: Sequence[float]) -> list[int]:
+    """Return the sizes of values that occur more than once."""
+    counts: dict[float, int] = {}
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    return [size for size in counts.values() if size > 1]
+
+
+def lag1(values: Sequence[float]) -> float:
+    """Pearson correlation of the series with itself shifted by one.
+
+    Clamped to [-0.999, 0.999]. If there is no variation, return 0.0.
+    """
+    n = len(values)
+    if n < 2:
+        return 0.0
+    left = values[:-1]
+    right = values[1:]
+    m = n - 1
+    mean_left = sum(left) / m
+    mean_right = sum(right) / m
+    cov = 0.0
+    var_left = 0.0
+    var_right = 0.0
+    for a, b in zip(left, right):
+        da = a - mean_left
+        db = b - mean_right
+        cov += da * db
+        var_left += da * da
+        var_right += db * db
+    if var_left == 0.0 or var_right == 0.0:
+        return 0.0
+    r = cov / math.sqrt(var_left * var_right)
+    if r > 0.999:
+        return 0.999
+    if r < -0.999:
+        return -0.999
+    return r
 
 
 def mann_kendall_p(values: Sequence[float]) -> float | None:
     """Two-sided normal approximation to Mann-Kendall S.
 
     Returns None when n < 8, because a short series is not a trend test.
-    Otherwise z = (S - sign(S)) / sqrt(var) with the continuity correction,
-    and p = erfc(|z| / sqrt(2)). var is mann_kendall_variance(n). Observations
-    are assumed independent. Autocorrelation is not corrected, and ties are
-    not corrected. This p-value is not a certificate.
+    var starts at n(n-1)(2n+5)/18. For each tie-group size t > 1, subtract
+    t(t-1)(2t+5)/18. Positive lag-1 is an AR(1) inflation, not the full
+    Hamed-Rao sum. If r1 > 0, n_eff = n * (1 - r1) / (1 + r1). If n_eff < 8,
+    return None. If n_eff >= 8, multiply var by n / n_eff. If r1 <= 0, var
+    is not changed. Negative lag-1 does not shrink the variance. Then
+    z = (S - sign(S)) / sqrt(var) with the continuity correction, and
+    p = erfc(|z| / sqrt(2)). This p-value is not a certificate.
     """
     n = len(values)
     if n < 8:
         return None
+    r1 = lag1(values)
     s = mann_kendall(values)
-    var = mann_kendall_variance(n)
+    var = mann_kendall_variance(n, tie_counts(values))
+    if r1 > 0.0:
+        n_eff = n * (1.0 - r1) / (1.0 + r1)
+        if n_eff < 8:
+            return None
+        var *= n / n_eff
     sign = (s > 0) - (s < 0)
     z = (s - sign) / math.sqrt(var)
     return math.erfc(abs(z) / math.sqrt(2))

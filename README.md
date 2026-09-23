@@ -8,7 +8,7 @@ Sen slope is the median pairwise slope of that residual. It needs at least two p
 
 mann_kendall returns S only. S is up steps minus down steps. S is a count, not a significance test.
 
-The p function is a normal approximation for n >= 8 under an independence assumption. It applies a continuity correction, z = (S - sign(S)) / sqrt(var), with var = n(n-1)(2n+5)/18, and p = erfc(|z| / sqrt(2)). It does not correct autocorrelation. It does not correct ties. It returns None when n < 8. It is not a certificate and not a basin study.
+The p function is a normal approximation. It returns None when n < 8. With no ties, var = n(n-1)(2n+5)/18. For each tie group of size t > 1, subtract t(t-1)(2t+5)/18. Lag-1 is the Pearson correlation of the series with itself shifted by one, clamped to [-0.999, 0.999]. If there is no variation, lag-1 is 0. Only a positive lag-1 is used, and only as an AR(1) inflation, not the full Hamed-Rao sum. Then n_eff = n * (1 - r1) / (1 + r1). If n_eff < 8, p is withheld. If n_eff >= 8, var is multiplied by n / n_eff. A lag-1 that is not positive does not change var. Negative lag-1 does not shrink the variance. The continuity correction is z = (S - sign(S)) / sqrt(var), and p = erfc(|z| / sqrt(2)). A straight worked example prints p=dependent because the months move together. S and the Sen slope are still printed. Not a basin study. Not a certificate.
 
 The worked months in examples/ are not a customer file and not InSAR or GRACE.
 
