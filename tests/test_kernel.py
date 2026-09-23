@@ -34,6 +34,8 @@ from splitrecord.score import (  # noqa: E402
     mann_kendall,
     mann_kendall_p,
     mann_kendall_variance,
+    lag1,
+    mann_kendall_p_ordinary,
     residual,
     seasonal_p,
     seasonal_s,
@@ -41,6 +43,7 @@ from splitrecord.score import (  # noqa: E402
     seasonal_variance,
     sen_slope,
     tie_counts,
+    trend_free_prewhiten,
     zscores,
 )
 
@@ -284,6 +287,63 @@ class SeasonalCommandTests(unittest.TestCase):
         )
         self.assertEqual(cov.returncode, 0, cov.stderr)
         self.assertIn("variance=hirsch-slack", cov.stdout)
+
+
+
+class PrewhitenTests(unittest.TestCase):
+    def test_lag1_uses_one_mean(self) -> None:
+        # mean 2.5, denom 5, numer 1.25. A two-window Pearson correlation is 1.
+        self.assertAlmostEqual(lag1([1.0, 2.0, 3.0, 4.0]), 0.25)
+
+    def test_line_keeps_its_slope(self) -> None:
+        series = [float(i) for i in range(6)]
+        whitened, r1 = trend_free_prewhiten(series)
+        self.assertEqual(r1, 0.0)
+        self.assertEqual(len(whitened), 5)
+        self.assertEqual(sen_slope(whitened), 1.0)
+
+    def test_blend_matches_the_formula(self) -> None:
+        series = [0.0, 1.0, 0.5, 1.5, 1.0, 2.0, 1.5, 2.5, 2.0]
+        beta = sen_slope(series)
+        detrended = [value - beta * index for index, value in enumerate(series)]
+        r1 = lag1(detrended)
+        whitened, got_r = trend_free_prewhiten(series)
+        self.assertAlmostEqual(got_r, r1)
+        self.assertEqual(len(whitened), len(series) - 1)
+        for t in range(1, len(series)):
+            expected = (detrended[t] - r1 * detrended[t - 1]) + beta * t
+            self.assertAlmostEqual(whitened[t - 1], expected)
+        ordinary = mann_kendall_variance(len(whitened), tie_counts(whitened))
+        s = mann_kendall(whitened)
+        sign = (s > 0) - (s < 0)
+        p = math.erfc(abs((s - sign) / math.sqrt(ordinary)) / math.sqrt(2))
+        self.assertAlmostEqual(mann_kendall_p_ordinary(whitened), p)
+
+    def test_prewhiten_does_not_stack(self) -> None:
+        env = dict(os.environ, PYTHONPATH=str(SRC))
+        proc = subprocess.run(
+            [sys.executable, "-m", "splitrecord", "a.csv", "b.csv", "--prewhiten", "--seasons", "2"],
+            cwd=ROOT, env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("separate", proc.stderr)
+        line = subprocess.run(
+            [
+                sys.executable, "-m", "splitrecord",
+                str(ROOT / "examples" / "left.csv"),
+                str(ROOT / "examples" / "right.csv"),
+                "--prewhiten",
+            ],
+            cwd=ROOT, env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(line.returncode, 0, line.stderr)
+        self.assertRegex(
+            line.stdout.strip(),
+            r"^rows=12 residual=z\(A\)-z\(B\) series=trend-free-prewhiten "
+            r"whitened_rows=11 r1=\S+ theil_sen_z_per_row=\S+ "
+            r"mann_kendall_S=-?\d+ variance=ordinary p=\S+$",
+        )
+        self.assertNotIn("hamed-rao", line.stdout)
 
 
 if __name__ == "__main__":

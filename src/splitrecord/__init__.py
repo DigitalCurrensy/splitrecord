@@ -18,6 +18,7 @@ from .report import compile_report, fnv1a_32
 from .score import (
     mann_kendall,
     mann_kendall_p,
+    mann_kendall_p_ordinary,
     mann_kendall_variance,
     residual,
     seasonal_p,
@@ -25,6 +26,7 @@ from .score import (
     seasonal_sen_slope,
     seasonal_variance,
     sen_slope,
+    trend_free_prewhiten,
     zscores,
 )
 
@@ -39,6 +41,8 @@ __all__ = [
     "seasonal_s",
     "seasonal_sen_slope",
     "seasonal_variance",
+    "mann_kendall_p_ordinary",
     "sen_slope",
+    "trend_free_prewhiten",
     "zscores",
 ]

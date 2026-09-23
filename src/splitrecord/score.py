@@ -112,30 +112,27 @@ def tie_counts(values: Sequence[float]) -> list[int]:
 
 
 def lag1(values: Sequence[float]) -> float:
-    """Pearson correlation of the series with itself shifted by one.
+    """Lag-1 autocorrelation. One mean, full sum of squares.
 
-    Clamped to [-0.999, 0.999]. If there is no variation, return 0.0.
+    numer = sum (x_t - mean) * (x_{t+1} - mean) over t = 0..n-2.
+    denom = sum (x_t - mean)^2 over the whole series.
+    This is not a Pearson correlation of the two windows. No variation
+    returns 0. The result is clamped to [-0.999, 0.999].
     """
     n = len(values)
     if n < 2:
         return 0.0
-    left = values[:-1]
-    right = values[1:]
-    m = n - 1
-    mean_left = sum(left) / m
-    mean_right = sum(right) / m
-    cov = 0.0
-    var_left = 0.0
-    var_right = 0.0
-    for a, b in zip(left, right):
-        da = a - mean_left
-        db = b - mean_right
-        cov += da * db
-        var_left += da * da
-        var_right += db * db
-    if var_left == 0.0 or var_right == 0.0:
+    mean = sum(values) / n
+    denom = 0.0
+    for value in values:
+        d = value - mean
+        denom += d * d
+    if denom == 0.0:
         return 0.0
-    r = cov / math.sqrt(var_left * var_right)
+    numer = 0.0
+    for t in range(n - 1):
+        numer += (values[t] - mean) * (values[t + 1] - mean)
+    r = numer / denom
     if r > 0.999:
         return 0.999
     if r < -0.999:
@@ -372,3 +369,45 @@ def seasonal_p(values: Sequence[float], period: int, covariance: bool = False) -
     sign = (s > 0) - (s < 0)
     z = (s - sign) / math.sqrt(var)
     return math.erfc(abs(z) / math.sqrt(2))
+
+
+def mann_kendall_p_ordinary(values: Sequence[float]) -> float | None:
+    """Two-sided Mann-Kendall p with the tie-corrected variance only.
+
+    The Hamed-Rao factor is not applied. Returns None when n < 8 or the
+    variance is not positive. z = (S - sign(S)) / sqrt(var).
+    """
+    n = len(values)
+    if n < 8:
+        return None
+    s = mann_kendall(values)
+    var = mann_kendall_variance(n, tie_counts(values))
+    if var <= 0.0:
+        return None
+    sign = (s > 0) - (s < 0)
+    z = (s - sign) / math.sqrt(var)
+    return math.erfc(abs(z) / math.sqrt(2))
+
+
+def trend_free_prewhiten(values: Sequence[float]) -> tuple[list[float], float]:
+    """Yue, Pilon, Phinney, and Cavadias (2002) trend-free pre-whitening.
+
+    Remove the Theil-Sen slope, estimate lag-1 on that remainder, whiten
+    the remainder, then add the slope back. The returned series has length
+    n-1 because each point uses the one before it. Requires len >= 3.
+
+    von Storch pre-whitening, which removes lag-1 before removing the slope,
+    is not this function. That order deletes part of the trend. Hamed-Rao
+    is not applied to the result. The caller uses mann_kendall_p_ordinary.
+    """
+    if len(values) < 3:
+        raise ValueError("not enough")
+    _finite(values)
+    beta = sen_slope(values)
+    detrended = [float(value) - beta * index for index, value in enumerate(values)]
+    r1 = lag1(detrended)
+    blended: list[float] = []
+    for t in range(1, len(values)):
+        whitened = detrended[t] - r1 * detrended[t - 1]
+        blended.append(whitened + beta * t)
+    return blended, r1

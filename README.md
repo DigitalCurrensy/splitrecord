@@ -29,11 +29,20 @@ rows=12 residual=z(A)-z(B) seasons=2 theil_sen_z_per_year=... seasonal_S=... var
 
 `--covariance` replaces that variance with the Hirsch-Slack estimator. The off-diagonal term is (K + 4 * sum of rank products - n * (n+1)^2) / 3. It needs a complete table, one value for every season of every year. A short last year raises ValueError ("uneven"). The estimator allows months inside one year to move together. It does not correct a strong correlation from one year to the next. Hirsch and Slack reported that the test is not reliable for very persistent series, or for a record of about five years.
 
+`--prewhiten` is a third correction, and it is not stacked on the other two. It is the trend-free pre-whitening of Yue, Pilon, Phinney, and Cavadias (2002). The Theil-Sen slope is removed, lag-1 is estimated on that remainder with one mean and the full sum of squares, the remainder is whitened, and the slope is added back. The tested series is one row shorter. `variance=ordinary` means the tie-corrected Mann-Kendall variance with no Hamed-Rao factor. Combining `--prewhiten` with `--seasons` or `--covariance` raises `separate`.
+
+von Storch pre-whitening is not implemented. That method removes lag-1 before removing the slope, and part of a real trend leaves with it.
+
+```
+rows=12 residual=z(A)-z(B) series=trend-free-prewhiten whitened_rows=11 r1=... theil_sen_z_per_row=... mann_kendall_S=... variance=ordinary p=...
+```
+
 ```
 pip install -e .
 python -m unittest tests.test_kernel
 python -m splitrecord examples/left.csv examples/right.csv
 python -m splitrecord examples/left.csv examples/right.csv --seasons 12
+python -m splitrecord examples/left.csv examples/right.csv --prewhiten
 ```
 
 Copyright 2026 Digital Currensy Inc. License Apache-2.0. LICENSE is unmodified. Copyright notice is in NOTICE and the file headers.
