@@ -43,6 +43,8 @@ from splitrecord.score import (  # noqa: E402
     seasonal_s,
     seasonal_sen_slope,
     seasonal_variance,
+    exact_slope_ranks,
+    sen_exact_limits,
     sen_limits,
     pairwise_slopes,
     Z_95,
@@ -195,7 +197,7 @@ class CommandTests(unittest.TestCase):
         self.assertRegex(
             lines[0],
             r"^rows=12 residual=z\(A\)-z\(B\) theil_sen_z_per_row=\S+ "
-            r"sen95_lo=\S+ sen95_hi=\S+ hamed95_lo=\S+ hamed95_hi=\S+ "
+            r"sen95=normal sen95_lo=\S+ sen95_hi=\S+ hamed95_lo=\S+ hamed95_hi=\S+ "
             r"mann_kendall_S=-?\d+ tau=\S+ var=\S+ n_over_nstar=\S+ z=\S+ variance=hamed-rao p=\S+$",
         )
         s_token = next(part for part in lines[0].split() if part.startswith("mann_kendall_S="))
@@ -347,7 +349,7 @@ class PrewhitenTests(unittest.TestCase):
             line.stdout.strip(),
             r"^rows=12 residual=z\(A\)-z\(B\) series=trend-free-prewhiten "
             r"whitened_rows=11 removed_sen=\S+ r1=\S+ theil_sen_z_per_row=\S+ "
-            r"sen95_lo=\S+ sen95_hi=\S+ "
+            r"sen95=normal sen95_lo=\S+ sen95_hi=\S+ "
             r"mann_kendall_S=-?\d+ tau=\S+ var=\S+ z=\S+ variance=ordinary p=\S+$",
         )
         self.assertNotIn("hamed-rao", line.stdout)
@@ -372,7 +374,7 @@ class PrewhitenExampleTests(unittest.TestCase):
             line,
             "rows=9 residual=z(A)-z(B) series=trend-free-prewhiten "
             "whitened_rows=8 removed_sen=0.04892060565 r1=-0.888889 "
-            "theil_sen_z_per_row=0.04892060565 sen95_lo=0.02783875459 sen95_hi=0.0840570241 mann_kendall_S=22 "
+            "theil_sen_z_per_row=0.04892060565 sen95=normal sen95_lo=0.02783875459 sen95_hi=0.0840570241 mann_kendall_S=22 "
             "tau=0.7857142857 var=65.33333333 z=2.598076211 variance=ordinary p=0.00937477",
         )
         series = residual(
@@ -414,6 +416,15 @@ class MannKendallTests(unittest.TestCase):
 
 
 class SenLimitTests(unittest.TestCase):
+
+    def test_sens_seven_point_series(self) -> None:
+        values = [9.0, 15.0, 19.0, 20.0, 45.0, 55.0, 78.0]
+        times = [1.0, 2.0, 3.0, 4.0, 10.0, 12.0, 18.0]
+        self.assertEqual(exact_slope_ranks(7), (4, 18))
+        self.assertEqual(sen_slope(values, times), 4.0)
+        self.assertEqual(sen_exact_limits(values, times), ("3.714285714", "4.375"))
+        self.assertEqual(sen_limits(values, mann_kendall_variance(7)), ("short", "short"))
+
     def test_gilbert_ranks(self) -> None:
         series = [1.0, 3.0, 2.0, 5.0, 4.0, 6.0, 8.0, 7.0]
         slopes = pairwise_slopes(series)

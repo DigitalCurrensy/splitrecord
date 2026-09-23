@@ -26,6 +26,7 @@ from .score import (
     seasonal_s,
     seasonal_sen_slope,
     seasonal_zp,
+    sen_exact_limits,
     sen_limits,
     tie_counts,
     sen_slope,
@@ -88,11 +89,21 @@ def _parse(args: list[str]) -> tuple[str, str, int | None, bool, bool]:
 
 
 def _sen_fields(values: list[float], ordinary: float, corrected: float | None = None) -> str:
-    lo, hi = sen_limits(values, ordinary)
-    if corrected is None:
-        return f"sen95_lo={lo} sen95_hi={hi}"
-    hlo, hhi = sen_limits(values, corrected)
-    return f"sen95_lo={lo} sen95_hi={hi} hamed95_lo={hlo} hamed95_hi={hhi}"
+    if len(values) < 8 and not tie_counts(values):
+        lo, hi = sen_exact_limits(values)
+        method = "exact"
+        hlo, hhi = "short", "short"
+    else:
+        lo, hi = sen_limits(values, ordinary)
+        method = "normal" if lo not in {"short", "dependent", "wide"} else lo
+        if corrected is None or len(values) < 8:
+            hlo, hhi = (None, None) if corrected is None else ("short", "short")
+        else:
+            hlo, hhi = sen_limits(values, corrected)
+    body = f"sen95={method} sen95_lo={lo} sen95_hi={hi}"
+    if hlo is None:
+        return body
+    return f"{body} hamed95_lo={hlo} hamed95_hi={hhi}"
 
 
 def main(argv: list[str] | None = None) -> int:

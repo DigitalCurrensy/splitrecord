@@ -6,7 +6,7 @@ The residual is z(A) minus z(B). Each z-score subtracts the sample mean and divi
 
 The size of the drift is the Theil-Sen slope, also called Sen's slope. It is the median of the pairwise slopes (v_j - v_i) / (j - i). An odd count takes the middle slope. An even count averages the two middle slopes. It needs at least two points. The unit is per row, not per date. There is no intercept and no confidence interval. The estimator does not assume a normal distribution. Its known breakdown point is 1 - 1/sqrt(2), about 29%. This library computes the median. It does not run a separate breakdown trial.
 
-The 95% interval is not the median. Sort the same pairwise slopes. Let k be how many there are, and let V be the tie-corrected Mann-Kendall variance with no Hamed-Rao factor. C = 1.95996398454 × √V. The lower rank is round((k − C) / 2). The upper rank is round((k + C) / 2 + 1). Ranks start at 1. A half rounds to even. The slopes at those two ranks are sen95_lo and sen95_hi. Under 8 rows the interval is short. Ranks outside the list are wide. hamed95 uses that same rank rule with V multiplied by n/n*. It is not Sen's interval.
+The 95% interval is not the median. Sort the same pairwise slopes. Let k be how many there are, and let V be the tie-corrected Mann-Kendall variance with no Hamed-Rao factor. C = 1.95996398454 × √V. The lower rank is round((k − C) / 2). The upper rank is round((k + C) / 2 + 1). Ranks start at 1. A half rounds to even. The slopes at those two ranks are sen95_lo and sen95_hi, and the line says sen95=normal. Under 8 rows with no ties, that normal rank is not used. The line says sen95=exact. q is the largest integer with P(C < q) <= 0.025, where C counts upward pairs and every ordering is equally likely. The ranks are q and N+1-q. A tie under 8 rows is short. Ranks outside the list are wide. hamed95 uses that same rank rule with V multiplied by n/n*. It is not Sen's interval.
 
 mann_kendall returns S only. S is up steps minus down steps. A tie adds nothing. S is a count, not a slope and not a p-value.
 
@@ -20,7 +20,7 @@ Do not average the records. Do not fetch granules. Do not sign a permit.
 The printed line names every field.
 
 ```
-rows=12 residual=z(A)-z(B) theil_sen_z_per_row=0.5547001962 sen95_lo=0.5547001962 sen95_hi=0.5547001962 hamed95_lo=0.5547001962 hamed95_hi=0.5547001962 mann_kendall_S=66 tau=1 var=212.6666667 n_over_nstar=1 z=4.457215629 variance=hamed-rao p=8.30311e-06
+rows=12 residual=z(A)-z(B) theil_sen_z_per_row=0.5547001962 sen95=normal sen95_lo=0.5547001962 sen95_hi=0.5547001962 hamed95_lo=0.5547001962 hamed95_hi=0.5547001962 mann_kendall_S=66 tau=1 var=212.6666667 n_over_nstar=1 z=4.457215629 variance=hamed-rao p=8.30311e-06
 ```
 
 `var` is the tie-corrected variance times `n_over_nstar`. `z` is (S - sign(S)) / sqrt(var). `p` is erfc(|z| / sqrt(2)). On this file the factor is 1: after the Sen slope is removed, the ranks do not vary, so no lag is kept. A repeating series is different. For `5, 5, 5, 0` repeated three times, S is -9, the ordinary variance is 117, `n_over_nstar` is 1.339393939, and `var` is 156.7090909. Yue and Wang's lag-1-only factor is not this number. The sum still runs over every lag. On 1, 1.4, 1.1, 2.2, 1.8, 2.9, 2.4, 3.6, 3.0, 4.1, 3.7, 4.8 the ordinary variance is 212.6666667 and n/n* is 0.08583916084, so the corrected variance is 18.25512821. There are 66 pairwise slopes. Sen's C picks ranks 19 and 48, which are 0.25 and 0.38. The corrected C picks ranks 29 and 38, which are 0.3166666667 and 0.3454545455.
@@ -57,7 +57,7 @@ python -m splitrecord examples/pw_left.csv examples/pw_right.csv --prewhiten
 ```
 
 ```
-rows=9 residual=z(A)-z(B) series=trend-free-prewhiten whitened_rows=8 removed_sen=0.04892060565 r1=-0.888889 theil_sen_z_per_row=0.04892060565 sen95_lo=0.02783875459 sen95_hi=0.0840570241 mann_kendall_S=22 tau=0.7857142857 var=65.33333333 z=2.598076211 variance=ordinary p=0.00937477
+rows=9 residual=z(A)-z(B) series=trend-free-prewhiten whitened_rows=8 removed_sen=0.04892060565 r1=-0.888889 theil_sen_z_per_row=0.04892060565 sen95=normal sen95_lo=0.02783875459 sen95_hi=0.0840570241 mann_kendall_S=22 tau=0.7857142857 var=65.33333333 z=2.598076211 variance=ordinary p=0.00937477
 ```
 
 `removed_sen` is the slope that was taken off. `theil_sen_z_per_row` is the Sen slope of the blended series. They match in this file. They do not match in every file. `variance=ordinary` is not Hamed-Rao.

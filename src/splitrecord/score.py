@@ -60,36 +60,118 @@ def residual(a: Sequence[float], b: Sequence[float]) -> list[float]:
 Z_95 = 1.95996398454
 
 
-def pairwise_slopes(values: Sequence[float]) -> list[float]:
-    """Every (v_j - v_i) / (j - i), sorted ascending.
+def pairwise_slopes(
+    values: Sequence[float], times: Sequence[float] | None = None
+) -> list[float]:
+    """Every (v_j - v_i) / (t_j - t_i), sorted ascending.
 
-    j and i are zero-based row indexes. The rows are equally spaced.
-    Requires at least two finite points.
+    Times default to the row index, so equally spaced rows use j - i.
+    A repeated time raises ValueError("tied time"). A decreasing time
+    raises ValueError("time order"). Requires at least two finite points.
     """
     n = len(values)
     if n < 2:
         raise ValueError("not enough")
+    if times is None:
+        times = list(range(n))
+    if len(times) != n:
+        raise ValueError("align first")
     _finite(values)
-    slopes = [
-        (values[j] - values[i]) / (j - i)
-        for i in range(n)
-        for j in range(i + 1, n)
-    ]
+    _finite(list(times))
+    slopes = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            gap = float(times[j]) - float(times[i])
+            if gap == 0.0:
+                raise ValueError("tied time")
+            if gap < 0.0:
+                raise ValueError("time order")
+            slopes.append((values[j] - values[i]) / gap)
     slopes.sort()
     return slopes
 
 
-def sen_slope(values: Sequence[float]) -> float:
+def sen_slope(values: Sequence[float], times: Sequence[float] | None = None) -> float:
     """Median of the pairwise slopes. The Sen (1968) estimator.
 
     An odd count takes the middle slope. An even count averages the two
-    middle slopes. There is no intercept.
+    middle slopes. There is no intercept. times defaults to the row index.
     """
-    slopes = pairwise_slopes(values)
+    slopes = pairwise_slopes(values, times)
     m = len(slopes)
     if m % 2:
         return slopes[m // 2]
     return 0.5 * (slopes[m // 2 - 1] + slopes[m // 2])
+
+
+
+def _inversion_counts(n: int) -> list[int]:
+    """Number of permutations of n with each inversion count. Index is the count."""
+    cap = n * (n - 1) // 2
+    prev = [0] * (cap + 1)
+    prev[0] = 1
+    for m in range(1, n):
+        # Adding the next item (m+1 items total) creates 0..m new inversions.
+        width = (m + 1) * m // 2
+        cur = [0] * (width + 1)
+        for inversions, count in enumerate(prev):
+            if count == 0:
+                continue
+            for extra in range(m + 1):
+                cur[inversions + extra] += count
+        prev = cur
+    return prev
+
+
+def exact_slope_ranks(n: int, alpha: float = 0.025) -> tuple[int, int] | None:
+    """1-based ranks for the exact no-tie Sen interval.
+
+    C is the number of upward pairs, N minus the inversion count.
+    q is the largest integer with P(C < q) <= alpha. The ranks are q and
+    N + 1 - q. None when no such q exists.
+    """
+    if n < 3:
+        return None
+    counts = _inversion_counts(n)
+    total = float(sum(counts))
+    pairs = n * (n - 1) // 2
+    best: int | None = None
+    running = 0
+    # counts[k] is P-weight of C = pairs - k, walking C from 0 upward.
+    for concordant in range(0, pairs + 1):
+        inversions = pairs - concordant
+        running += counts[inversions]
+        # P(C < concordant + 1) == running / total after this concordant is included? 
+        # After adding C=concordant, running/total = P(C <= concordant) = P(C < concordant+1)
+        if running / total <= alpha:
+            best = concordant + 1
+        else:
+            break
+    if best is None:
+        return None
+    return best, pairs + 1 - best
+
+
+def sen_exact_limits(
+    values: Sequence[float], times: Sequence[float] | None = None
+) -> tuple[str, str]:
+    """Exact no-tie 95% Sen interval. Ties return ("short", "short").
+
+    This is not the normal approximation. n under 3 returns short.
+    times defaults to the row index. The ranks do not depend on the times.
+    The slope values do.
+    """
+    n = len(values)
+    if n < 3 or tie_counts(values):
+        return "short", "short"
+    ranks = exact_slope_ranks(n)
+    if ranks is None:
+        return "wide", "wide"
+    slopes = pairwise_slopes(values, times)
+    lo, hi = ranks
+    if lo < 1 or hi > len(slopes) or lo > hi:
+        return "wide", "wide"
+    return f"{slopes[lo - 1]:.10g}", f"{slopes[hi - 1]:.10g}"
 
 
 def sen_limits(values: Sequence[float], variance: float) -> tuple[str, str]:
