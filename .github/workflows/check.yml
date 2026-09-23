@@ -10,5 +10,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install
+        run: pip install -e .
       - name: Kernel tests
-        run: PYTHONPATH=src python -m unittest tests.test_kernel
+        run: python -m unittest tests.test_kernel
+      - name: Example
+        run: python -m splitrecord examples/left.csv examples/right.csv

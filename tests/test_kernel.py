@@ -156,6 +156,10 @@ class CommandTests(unittest.TestCase):
         lines = proc.stdout.splitlines()
         self.assertEqual(len(lines), 1)
         self.assertRegex(lines[0], r"^n=12 sen=\S+ S=-?\d+ p=(short|\d)")
+        self.assertIn("n=12", lines[0])
+        s_token = next(part for part in lines[0].split() if part.startswith("S="))
+        s_value = int(s_token.split("=", 1)[1])
+        self.assertNotEqual(s_value, 0)
 
     def test_malformed_row_exits(self) -> None:
         env = dict(os.environ, PYTHONPATH=str(SRC))
