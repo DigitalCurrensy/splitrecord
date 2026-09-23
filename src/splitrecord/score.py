@@ -162,6 +162,9 @@ def sen_exact_limits(
     The slope values do.
     """
     n = len(values)
+    _finite(values)
+    if times is not None:
+        _finite(list(times))
     if n < 3 or tie_counts(values):
         return "short", "short"
     ranks = exact_slope_ranks(n)
@@ -189,6 +192,7 @@ def sen_limits(values: Sequence[float], variance: float) -> tuple[str, str]:
     is not positive returns ("dependent", "dependent"). Ranks outside 1..k
     return ("wide", "wide").
     """
+    _finite(values)
     n = len(values)
     if n < 8:
         return "short", "short"
@@ -219,6 +223,7 @@ def gilbert_limits(values: Sequence[float], variance: float) -> tuple[str, str]:
     returns ("dependent", "dependent"). A rank outside 1..k returns
     ("wide", "wide").
     """
+    _finite(values)
     n = len(values)
     if n < 8:
         return "short", "short"
@@ -289,6 +294,7 @@ def lag1(values: Sequence[float]) -> float:
     This is not a Pearson correlation of the two windows. No variation
     returns 0. The result is clamped to [-0.999, 0.999].
     """
+    _finite(values)
     n = len(values)
     if n < 2:
         return 0.0

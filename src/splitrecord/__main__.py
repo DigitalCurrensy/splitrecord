@@ -93,7 +93,7 @@ def _sen_fields(values: list[float], ordinary: float, corrected: float | None = 
     if len(values) < 8 and not tie_counts(values):
         lo, hi = sen_exact_limits(values)
         method = "exact"
-        hlo, hhi = "short", "short"
+        hlo, hhi = ("short", "short") if corrected is not None else (None, None)
     else:
         lo, hi = sen_limits(values, ordinary)
         method = "normal" if lo not in {"short", "dependent", "wide"} else lo

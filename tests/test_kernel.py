@@ -449,6 +449,28 @@ class SenLimitTests(unittest.TestCase):
         self.assertEqual(sen_exact_limits(values, times), ("3.714285714", "4.375"))
         self.assertEqual(sen_limits(values, mann_kendall_variance(7)), ("short", "short"))
 
+    def test_exact_prewhiten_does_not_print_hamed(self) -> None:
+        from splitrecord.__main__ import _sen_fields
+
+        plain = _sen_fields([1.0, 2.0, 3.0, 4.0, 5.0], 10.0)
+        self.assertIn("sen95=exact", plain)
+        self.assertNotIn("hamed95", plain)
+        stacked = _sen_fields([1.0, 2.0, 3.0, 4.0, 5.0], 10.0, 12.0)
+        self.assertIn("hamed95_lo=short", stacked)
+
+    def test_bad_number_is_not_a_limit(self) -> None:
+        for bad in (float("nan"), float("inf")):
+            with self.assertRaises(ValueError):
+                sen_limits([bad, 1.0, 2.0], 5.0)
+            with self.assertRaises(ValueError):
+                sen_exact_limits([bad, 1.0, 2.0, 3.0])
+            with self.assertRaises(ValueError):
+                gilbert_limits([bad, 1.0, 2.0], 5.0)
+            with self.assertRaises(ValueError):
+                lag1([bad])
+            with self.assertRaises(ValueError):
+                lag1([bad, 1.0, 2.0])
+
     def test_gilbert_ranks(self) -> None:
         series = [1.0, 3.0, 2.0, 5.0, 4.0, 6.0, 8.0, 7.0]
         slopes = pairwise_slopes(series)
