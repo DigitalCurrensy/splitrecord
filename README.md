@@ -3,7 +3,8 @@
 For a hydrologist who already holds two official records of one basin and cannot honestly average them.
 
 **Owner:** Digital Currensy Inc.
-**License:** Apache-2.0. Our code only. Cited data and papers stay with their authors.
+**Copyright:** 2026 Digital Currensy Inc.
+**License:** Apache-2.0. The file named LICENSE is the standard license and is not edited. The copyright notice is in NOTICE and at the top of each source file. Cited data and papers stay with their authors.
 ## What it decides
 
 Split, or no split. The residual is the result.
