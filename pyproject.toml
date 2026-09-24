@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "splitrecord"
 version = "0.1.0"
-description = "Score the disagreement between two aligned records. Residual is z(A) minus z(B)."
+description = "Z-score residual, Theil-Sen slope, and Mann-Kendall for two aligned records."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}

@@ -1,5 +1,29 @@
 # SPLITRECORD
 
+[![check](https://github.com/DigitalCurrensy/splitrecord/actions/workflows/check.yml/badge.svg)](https://github.com/DigitalCurrensy/splitrecord/actions/workflows/check.yml)
+
+For a hydrologist who already has two aligned records and wants the disagreement, not a new survey.
+
+The command prints the z-score residual, the Theil–Sen slope, and a Mann–Kendall test. The default variance is the Hamed–Rao correction. A blank, a mismatch, or a column with no spread is refused.
+
+This is not a basin study and not a permit.
+
+## Install
+
+```bash
+pip install -e .
+PYTHONPATH=src python -m unittest tests.test_kernel
+```
+
+## First command
+
+```bash
+PYTHONPATH=src python -m splitrecord examples/left.csv examples/right.csv
+```
+
+The rest of this file is the formula that command prints.
+
+
 SPLITRECORD is for a hydrologist who already holds two official records of one basin.
 
 The residual is z(A) minus z(B). Each z-score subtracts the sample mean and divides by the sample standard deviation. The sample standard deviation uses divisor n-1. Lengths must already match. A length under 2 raises ValueError ("not enough"). A sample standard deviation of 0 raises ValueError ("no spread"). Unequal lengths raise ValueError ("align first").
