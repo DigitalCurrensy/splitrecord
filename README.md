@@ -27,7 +27,7 @@ The rest of this file is the formula that command prints.
 
 `--json` prints one object. The process exit code is that object's `exit`. 0 is a pass word (`ok`, `pass`, `scored`, `path`). 1 is a refusal. 2 means the file could not be read. `keep` is false. `absent` is what this output does not contain: a stamp, measured basin months, and the points inside a `.laz` file.
 
-This object is not WaterML and it is not a USGS response. Nothing is fetched. `examples/gauge.rdb`, `examples/gauge.wml11.xml`, `examples/gauge.wml2.xml`, `examples/gauge.dv.json`, and `examples/gauge.ogc.json` are the same three synthetic numbers written in five formats. They are not a gauged basin.
+This object is not WaterML and it is not a USGS response. Nothing is fetched. `examples/gauge.rdb`, `examples/gauge.wml11.xml`, `examples/gauge.wml2.xml`, `examples/gauge.tsml.xml`, `examples/gauge.dv.json`, and `examples/gauge.ogc.json` are the same three synthetic numbers written in six formats. They are not a gauged basin.
 
 A file already on disk is a column:
 
@@ -35,7 +35,7 @@ A file already on disk is a column:
 | --- | --- | --- |
 | `.csv` | One number per row | The number |
 | `.rdb` | USGS tab file. `#` comments, a name row, a type row (`5s`, `12n`, `20d`) | `dv_va` |
-| `.xml` | WaterML 1.1, a `value` element with `dateTime`, or WaterML 2.0, a `MeasurementTVP` | The observation |
+| `.xml` | WaterML 1.1, a `value` element with `dateTime`; WaterML 2.0, a `MeasurementTVP`; or TimeseriesML 1.0, a `MeasurementTVP` | The observation |
 | `.json` | Legacy WaterServices JSON (`value.timeSeries`), or an OGC FeatureCollection whose properties include `value` | The observation |
 
 WaterML 1.1 is the CUAHSI XML that legacy WaterServices (`waterservices.usgs.gov`) returns. Its JSON mode is that same tree, not a new schema. WaterML 2.0 is OGC 10-126r4, Part 1, Timeseries. It is an Observations and Measurements document. WaterServices does not serve it. The API that replaces WaterServices is `https://api.waterdata.usgs.gov/ogcapi/`. A daily item is GeoJSON. The properties on a live feature are `time`, `value`, `parameter_code`, `unit_of_measure`, `approval_status`, `qualifier`, `monitoring_location_id`, and `statistic_id`. USGS has said WaterServices will be turned off on 22 February 2027. This library does not call either address.
@@ -51,6 +51,19 @@ WaterML 2.0 observation types, and what this command does with each:
 | WaterML 1.1 | `value` with `dateTime` | Reads the number. This is not an OGC type. |
 
 A point marked `xsi:nil` is refused, not skipped. Skipping it would move every later row, and the slope is computed on row order. Parts 2, 3, and 4 of WaterML 2 (ratings, surface features, groundwater) are not read. An interpolation type is not applied. The unit is not converted.
+
+TimeseriesML 1.0 is OGC 15-042r3, the XML encoding of the Timeseries Profile (OGC 15-043r3). It is not WaterML 2.1. OGC has not published a WaterML 2.1. The namespace is `http://www.opengis.net/tsml/1.0`. Annex C maps `MeasurementTVP` onto the WaterML 2.0 element of the same name. This command reads that direct `value` child, in document order. The schema calls the result `TimeseriesTVP`. One collection example in the schema directory uses `Timeseries` for the same points. Both are one series.
+
+| TimeseriesML 1.0 observation | What this command does |
+| --- | --- |
+| Measurement TVP (`MeasurementTVP` inside `TimeseriesTVP` or `Timeseries`) | Reads the measure. One series only. `uom` is ignored. `time` is not the slope axis. |
+| Categorical TVP (`CategoricalTVP`, or an observation type containing `Categorical`) | Refuses. A token is not a number. |
+| Domain-range (`TimeseriesDomainRange`, `domainSet`, `rangeSet`, or a type containing `DomainRange`) | Refuses. Two lists are not a paired column. |
+| Two result series | Refuses. Joining them would invent one record. |
+| TimeseriesML 1.2 (OGC 15-042r5, `http://www.opengis.net/timeseriesml/1.2`) | Refuses. 1.2 changes domain-range metadata and allows time periods. |
+| TimeseriesML 1.3 (OGC 15-042r6, `http://www.opengis.net/timeseriesml/1.3`) | Refuses. 1.3 adds `numberTimeSteps`. |
+
+`examples/gauge.tsml.xml` is 1, 2, 3. The first point also carries an uncertainty quantity of 0.1. That nested `value` is not the column. A missing time is not filled in from `baseTime` and `spacing`. Quality, interpolation, and the unit are not read.
 
 `Ice`, `Ssn`, and a non-numeric row are a refusal. A JSON record from this program is not a water series, and it is refused.
 
@@ -86,7 +99,7 @@ SPLITRECORD is for a hydrologist who already holds two official records of one b
 
 The residual is z(A) minus z(B). Each z-score subtracts the sample mean and divides by the sample standard deviation. The sample standard deviation uses divisor n-1. Lengths must already match. A length under 2 raises ValueError ("not enough"). A sample standard deviation of 0 raises ValueError ("no spread"). Unequal lengths raise ValueError ("align first").
 
-The size of the drift is the Theil-Sen slope, also called Sen's slope. It is the median of the pairwise slopes (v_j - v_i) / (j - i). An odd count takes the middle slope. An even count averages the two middle slopes. It needs at least two points. The unit is per row, not per date. There is no intercept and no confidence interval. The estimator does not assume a normal distribution. Its known breakdown point is 1 - 1/sqrt(2), about 29%. This library computes the median. It does not run a separate breakdown trial.
+The size of the drift is the Theil-Sen slope, also called Sen's slope. It is the median of the pairwise slopes (v_j - v_i) / (j - i). An odd count takes the middle slope. An even count averages the two middle slopes. It needs at least two points. The unit is per row, not per date. There is no intercept. The median is a point, not an interval. The intervals below are separate functions. The estimator does not assume a normal distribution. Its known breakdown point is 1 - 1/sqrt(2), about 29%. This library computes the median. It does not run a separate breakdown trial.
 
 The 95% interval is not the median. Sort the same pairwise slopes. Let k be how many there are, and let V be the tie-corrected Mann-Kendall variance with no Hamed-Rao factor. C = 1.95996398454 × √V. The lower rank is round((k − C) / 2). The upper rank is round((k + C) / 2 + 1). Ranks start at 1. A half rounds to even. The slopes at those two ranks are sen95_lo and sen95_hi, and the line says sen95=normal. Under 8 rows with no ties, that normal rank is not used. The line says sen95=exact. q is the largest integer with P(C < q) <= 0.025, where C counts upward pairs and every ordering is equally likely. The ranks are q and N+1-q. A tie under 8 rows is short. Ranks outside the list are wide. hamed95 uses that same rounded rank with V multiplied by n/n*. It is not Sen's interval. gilbert95 interpolates instead of rounding: M1 = (k − C) / 2 and M2 = (k + C) / 2, then a straight line between the slopes at the floor and the ceiling. That is the form cited to Gilbert (1987). It is not a table copied from the book. On 0, 1, 3, 2, 5, 4, 7, 6, 9, 8 the interpolated limits are 0.6925461068 and 1.153726947.
 

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Score two numeric columns. CSV, USGS RDB, WaterML, or a USGS JSON file."""
+"""Score two numeric columns. CSV, USGS RDB, WaterML, TimeseriesML, or a USGS JSON file."""
 
 from __future__ import annotations
 
@@ -42,9 +42,12 @@ def read_column(path: str) -> list[float]:
     """Read one numeric column from a file already on disk.
 
     CSV is one number per row. `.rdb` is the USGS tab file, column `dv_va`.
-    `.xml` is WaterML 1.1 (`value` plus `dateTime`) or one WaterML 2.0
-    measurement time-value pair series (`MeasurementTVP`). A categorical
-    series, a domain-range series, a nil, and a second series are refused.
+    `.xml` is WaterML 1.1 (`value` plus `dateTime`), one WaterML 2.0
+    measurement time-value pair series (`MeasurementTVP`), or one
+    TimeseriesML 1.0 measurement series (OGC 15-042r3, namespace
+    `http://www.opengis.net/tsml/1.0`). A categorical series, a
+    domain-range series, a nil, a second series, and TimeseriesML 1.2
+    or 1.3 are refused.
     `.json` is either the legacy WaterServices tree
     (`value.timeSeries`) or an OGC FeatureCollection whose properties use
     `value`. This reader does not call USGS. A bad row raises ValueError.
@@ -134,53 +137,122 @@ def _nil(child: ET.Element) -> bool:
     return False
 
 
+def _tag_ns(tag: str) -> str:
+    if tag.startswith("{"):
+        return tag[1:].split("}", 1)[0]
+    return ""
+
+
+# TimeseriesML 1.2 is OGC 15-042r5. TimeseriesML 1.3 is OGC 15-042r6.
+# Neither namespace is 1.0. The TVP element is still named MeasurementTVP.
+_LATER_TSML = (
+    "http://www.opengis.net/timeseriesml/1.2",
+    "http://www.opengis.net/timeseriesml/1.3",
+)
+_TSML_10 = "http://www.opengis.net/tsml/1.0"
+_SERIES = {"MeasurementTimeseries", "TimeseriesTVP", "Timeseries"}
+
+
+def _series_count(root: ET.Element) -> int:
+    """Count result series, not a series nested inside another."""
+    parent: dict[ET.Element, ET.Element] = {}
+    for node in root.iter():
+        for child in list(node):
+            parent[child] = node
+    count = 0
+    for node in root.iter():
+        if _local(node.tag) not in _SERIES:
+            continue
+        owner = parent.get(node)
+        nested = False
+        while owner is not None:
+            if _local(owner.tag) in _SERIES:
+                nested = True
+                break
+            owner = parent.get(owner)
+        if not nested:
+            count += 1
+    return count
+
+
+def _type_tokens(root: ET.Element) -> list[str]:
+    """Observation-type tokens. Only an element named `type` counts."""
+    tokens: list[str] = []
+    for node in root.iter():
+        if _local(node.tag) != "type":
+            continue
+        if node.text and node.text.strip():
+            tokens.append(node.text.strip())
+        for key, raw in node.attrib.items():
+            if _local(key) in {"href", "title"} and str(raw).strip():
+                tokens.append(str(raw).strip())
+    return tokens
+
+
 def _read_waterml(path: str) -> list[float]:
-    """Read one numeric column from WaterML already on disk.
+    """Read one numeric column from WaterML or TimeseriesML already on disk.
 
-    WaterML 2.0 Part 1 (OGC 10-126r4) has two observation shapes and two
-    result types. This function reads one of them.
+    WaterML 2.0 Part 1 (OGC 10-126r4) and TimeseriesML 1.0 (OGC 15-042r3)
+    both encode a measurement time-value pair as `MeasurementTVP`. Annex C
+    of 15-042r3 maps that element onto the WaterML 2.0 element. The direct
+    child named `value` is the column. A nested `value` (the uncertainty
+    quantity) is not the column. `uom` is not converted. `time` is not the
+    slope axis. Interpolation is not applied.
 
-    Timeseries TVP observation, result `MeasurementTimeseries`: each point
-    is a `MeasurementTVP` (time, then a measure). That column is read.
-    Timeseries TVP observation, result `CategoricalTimeseries`: the value
-    is a token. Refused.
-    Domain-range observation: times and values are two lists (`domainSet`,
-    `rangeSet`). Refused. Pairing those lists would invent the row order.
-    A `Collection` with two `MeasurementTimeseries` members is refused.
-    Joining them would invent one record.
-    A point with `xsi:nil` is refused, not dropped. Dropping it would
-    change the row index the slope uses.
+    The 1.0 result element is `TimeseriesTVP` in the schema. The collection
+    example in that schema directory uses `Timeseries` for the same points.
+    Both names are one series. Two of them are refused.
+
+    Refused: `CategoricalTVP`, a domain-range document (`TimeseriesDomainRange`,
+    `domainSet`, `rangeSet`), an observation type whose token says Categorical
+    or DomainRange, `xsi:nil`, and a second series. TimeseriesML 1.2
+    (`http://www.opengis.net/timeseriesml/1.2`) and 1.3
+    (`http://www.opengis.net/timeseriesml/1.3`) are refused. 1.2 changes
+    domain-range metadata and time periods. 1.3 adds `numberTimeSteps`.
+    This function does not read those documents.
 
     WaterML 1.1 is the older CUAHSI document, not an OGC type. A `value`
     element that carries `dateTime` is that column. It is not read when a
-    WaterML 2.0 result is present.
+    WaterML 2.0 or TimeseriesML result is present.
     """
     try:
         root = ET.parse(path).getroot()
     except ET.ParseError as exc:
         raise ValueError(f"{path}: malformed row") from exc
+    namespaces = {_tag_ns(el.tag) for el in root.iter()}
+    if any(ns in _LATER_TSML for ns in namespaces):
+        raise ValueError(f"{path}: not timeseriesml 1.0")
     names = [_local(el.tag) for el in root.iter()]
-    if names.count("MeasurementTimeseries") > 1:
+    tokens = _type_tokens(root)
+    if (
+        "TimeseriesDomainRange" in names
+        or "domainSet" in names
+        or "rangeSet" in names
+        or any("DomainRange" in token for token in tokens)
+    ):
+        raise ValueError(f"{path}: domain-range")
+    if (
+        "CategoricalTimeseries" in names
+        or "CategoricalTVP" in names
+        or any("Categorical" in token for token in tokens)
+    ):
+        raise ValueError(f"{path}: categorical timeseries")
+    if _series_count(root) > 1:
         raise ValueError(f"{path}: more than one series")
     points = [el for el in root.iter() if _local(el.tag) == "MeasurementTVP"]
     if points:
         values: list[float] = []
         for point in points:
-            raw = None
-            nil = False
-            for child in list(point):
-                if _local(child.tag) != "value":
-                    continue
-                raw = child.text
-                nil = _nil(child)
-            if nil:
+            kids = [child for child in list(point) if _local(child.tag) == "value"]
+            if len(kids) != 1:
+                raise ValueError(f"{path}: malformed row")
+            child = kids[0]
+            if _nil(child):
                 raise ValueError(f"{path}: nil value")
-            values.append(_finite(path, raw))
+            values.append(_finite(path, child.text))
         return values
-    if "CategoricalTimeseries" in names or "CategoricalTVP" in names:
-        raise ValueError(f"{path}: categorical timeseries")
-    if "domainSet" in names or "rangeSet" in names:
-        raise ValueError(f"{path}: domain-range")
+    if _TSML_10 in namespaces:
+        raise ValueError(f"{path}: malformed row")
     values = []
     for el in root.iter():
         if _local(el.tag) != "value":

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- synthetic. not a USGS retrieval. not a gauged basin. TimeseriesML 1.0. -->
+<tsml:Timeseries xmlns:tsml="http://www.opengis.net/tsml/1.0" xmlns:swe="http://www.opengis.net/swe/2.0" xmlns:gml="http://www.opengis.net/gml/3.2" gml:id="synthetic">
+  <tsml:point>
+    <tsml:MeasurementTVP>
+      <tsml:metadata>
+        <tsml:PointMetadata>
+          <tsml:uncertainty>
+            <swe:Quantity>
+              <swe:uom code="m"/>
+              <swe:value>0.1</swe:value>
+            </swe:Quantity>
+          </tsml:uncertainty>
+        </tsml:PointMetadata>
+      </tsml:metadata>
+      <tsml:time>2024-01-01T00:00:00Z</tsml:time>
+      <tsml:value uom="m">1</tsml:value>
+    </tsml:MeasurementTVP>
+  </tsml:point>
+  <tsml:point>
+    <tsml:MeasurementTVP>
+      <tsml:time>2024-01-02T00:00:00Z</tsml:time>
+      <tsml:value uom="m">2</tsml:value>
+    </tsml:MeasurementTVP>
+  </tsml:point>
+  <tsml:point>
+    <tsml:MeasurementTVP>
+      <tsml:time>2024-01-03T00:00:00Z</tsml:time>
+      <tsml:value uom="m">3</tsml:value>
+    </tsml:MeasurementTVP>
+  </tsml:point>
+</tsml:Timeseries>

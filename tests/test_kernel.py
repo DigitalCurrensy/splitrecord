@@ -234,7 +234,7 @@ class CommandTests(unittest.TestCase):
         from splitrecord.__main__ import read_column
 
         examples = ROOT / "examples"
-        for name in ("gauge.rdb", "gauge.wml11.xml", "gauge.wml2.xml", "gauge.dv.json", "gauge.ogc.json"):
+        for name in ("gauge.rdb", "gauge.wml11.xml", "gauge.wml2.xml", "gauge.tsml.xml", "gauge.dv.json", "gauge.ogc.json"):
             self.assertEqual(read_column(str(examples / name)), [1.0, 2.0, 3.0], name)
         env = dict(os.environ, PYTHONPATH=str(SRC))
         csv_run = subprocess.run(
@@ -303,6 +303,88 @@ class CommandTests(unittest.TestCase):
                 with self.assertRaises(ValueError) as caught:
                     read_column(str(path))
                 self.assertIn(message, str(caught.exception))
+
+    def test_timeseriesml_10_reads_one_measurement_series(self) -> None:
+        from splitrecord.__main__ import read_column
+
+        def xml(ns: str, body: str) -> str:
+            return (
+                '<?xml version="1.0"?>'
+                f'<tsml:TimeseriesTVP xmlns:tsml="{ns}" '
+                'xmlns:swe="http://www.opengis.net/swe/2.0" '
+                'xmlns:gml="http://www.opengis.net/gml/3.2" '
+                'xmlns:om="http://www.opengis.net/om/2.0" '
+                'xmlns:xlink="http://www.w3.org/1999/xlink" '
+                'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+                f"{body}</tsml:TimeseriesTVP>"
+            )
+
+        one = xml(
+            "http://www.opengis.net/tsml/1.0",
+            "<tsml:point><tsml:MeasurementTVP>"
+            "<tsml:time>2024-01-01T00:00:00Z</tsml:time>"
+            '<tsml:value uom="m">4</tsml:value>'
+            "</tsml:MeasurementTVP></tsml:point>",
+        )
+        two = (
+            '<?xml version="1.0"?>'
+            '<tsml:Collection xmlns:tsml="http://www.opengis.net/tsml/1.0">'
+            "<tsml:observationMember><tsml:Timeseries>"
+            "<tsml:point><tsml:MeasurementTVP><tsml:value>1</tsml:value></tsml:MeasurementTVP></tsml:point>"
+            "</tsml:Timeseries></tsml:observationMember>"
+            "<tsml:observationMember><tsml:TimeseriesTVP>"
+            "<tsml:point><tsml:MeasurementTVP><tsml:value>2</tsml:value></tsml:MeasurementTVP></tsml:point>"
+            "</tsml:TimeseriesTVP></tsml:observationMember>"
+            "</tsml:Collection>"
+        )
+        categorical = xml(
+            "http://www.opengis.net/tsml/1.0",
+            "<tsml:point><tsml:CategoricalTVP>"
+            "<tsml:time>2024-01-01</tsml:time><tsml:value>high</tsml:value>"
+            "</tsml:CategoricalTVP></tsml:point>",
+        )
+        typed = xml(
+            "http://www.opengis.net/tsml/1.0",
+            '<om:type xlink:href="http://www.opengis.net/def/observationType/timeseriesML/1.0/CategoricalTimeseriesTVPObservation"/>'
+            "<tsml:point><tsml:MeasurementTVP><tsml:value>9</tsml:value></tsml:MeasurementTVP></tsml:point>",
+        )
+        domain = (
+            '<?xml version="1.0"?>'
+            '<tsml:TimeseriesDomainRange xmlns:tsml="http://www.opengis.net/tsml/1.0" '
+            'xmlns:gml="http://www.opengis.net/gml/3.2">'
+            "<gml:domainSet><tsml:TimePositionList>"
+            "<tsml:timePositionList>2024-01-01T00:00:00Z</tsml:timePositionList>"
+            "</tsml:TimePositionList></gml:domainSet>"
+            '<gml:rangeSet><gml:QuantityList uom="m">1</gml:QuantityList></gml:rangeSet>'
+            "</tsml:TimeseriesDomainRange>"
+        )
+        later = xml(
+            "http://www.opengis.net/timeseriesml/1.2",
+            "<tsml:point><tsml:MeasurementTVP><tsml:value>1</tsml:value></tsml:MeasurementTVP></tsml:point>",
+        )
+        later_13 = xml(
+            "http://www.opengis.net/timeseriesml/1.3",
+            "<tsml:point><tsml:MeasurementTVP><tsml:value>1</tsml:value></tsml:MeasurementTVP></tsml:point>",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            path = folder / "one.xml"
+            path.write_text(one, encoding="utf-8")
+            self.assertEqual(read_column(str(path)), [4.0])
+            for name, body, message in (
+                ("two.xml", two, "more than one series"),
+                ("cat.xml", categorical, "categorical timeseries"),
+                ("typed.xml", typed, "categorical timeseries"),
+                ("domain.xml", domain, "domain-range"),
+                ("v12.xml", later, "not timeseriesml 1.0"),
+                ("v13.xml", later_13, "not timeseriesml 1.0"),
+            ):
+                path = folder / name
+                path.write_text(body, encoding="utf-8")
+                with self.assertRaises(ValueError) as caught:
+                    read_column(str(path))
+                self.assertIn(message, str(caught.exception))
+
 
     def test_malformed_row_exits(self) -> None:
         env = dict(os.environ, PYTHONPATH=str(SRC))

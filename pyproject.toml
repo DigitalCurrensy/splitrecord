@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "splitrecord"
 version = "0.1.0"
-description = "Z-score residual, Theil-Sen slope, and Mann-Kendall for two aligned records. Reads one WaterML 2.0 measurement series."
+description = "Z-score residual, Theil-Sen slope, and Mann-Kendall for two aligned records. Reads one WaterML 2.0 or TimeseriesML 1.0 measurement series."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
