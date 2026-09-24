@@ -228,6 +228,35 @@ class CommandTests(unittest.TestCase):
 
         self.assertEqual(read_column(str(ROOT / "examples" / "gauge.rdb")), [1.0, 2.0, 3.0])
 
+    def test_written_usgs_shapes_score_the_same_series(self) -> None:
+        import json
+
+        from splitrecord.__main__ import read_column
+
+        examples = ROOT / "examples"
+        for name in ("gauge.rdb", "gauge.wml11.xml", "gauge.wml2.xml", "gauge.dv.json", "gauge.ogc.json"):
+            self.assertEqual(read_column(str(examples / name)), [1.0, 2.0, 3.0], name)
+        env = dict(os.environ, PYTHONPATH=str(SRC))
+        csv_run = subprocess.run(
+            [sys.executable, "-m", "splitrecord", str(examples / "left.csv"), str(examples / "right.csv"), "--json"],
+            cwd=ROOT, env=env, capture_output=True, text=True, check=False,
+        )
+        foreign = subprocess.run(
+            [sys.executable, "-m", "splitrecord", str(examples / "left.wml11.xml"), str(examples / "right.ogc.json"), "--json"],
+            cwd=ROOT, env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(foreign.returncode, 0, foreign.stderr)
+        self.assertEqual(json.loads(foreign.stdout), json.loads(csv_run.stdout))
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / "note.json"
+            bad.write_text('{"desk":"splitrecord","word":"scored"}\n', encoding="utf-8")
+            refused = subprocess.run(
+                [sys.executable, "-m", "splitrecord", str(bad), str(examples / "right.csv"), "--json"],
+                cwd=ROOT, env=env, capture_output=True, text=True, check=False,
+            )
+        self.assertEqual(refused.returncode, 1)
+        self.assertNotIn("Traceback", refused.stderr)
+
     def test_malformed_row_exits(self) -> None:
         env = dict(os.environ, PYTHONPATH=str(SRC))
         with tempfile.TemporaryDirectory() as tmp:

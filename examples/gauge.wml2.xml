@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- synthetic. not a USGS retrieval. not a gauged basin. -->
+<wml2:MeasurementTimeseries xmlns:wml2="http://www.opengis.net/waterml/2.0" xmlns:gml="http://www.opengis.net/gml/3.2" gml:id="synthetic">
+  <wml2:point>
+    <wml2:MeasurementTVP>
+      <wml2:time>2024-01-01T00:00:00Z</wml2:time>
+      <wml2:value>1</wml2:value>
+    </wml2:MeasurementTVP>
+  </wml2:point>
+  <wml2:point>
+    <wml2:MeasurementTVP>
+      <wml2:time>2024-01-02T00:00:00Z</wml2:time>
+      <wml2:value>2</wml2:value>
+    </wml2:MeasurementTVP>
+  </wml2:point>
+  <wml2:point>
+    <wml2:MeasurementTVP>
+      <wml2:time>2024-01-03T00:00:00Z</wml2:time>
+      <wml2:value>3</wml2:value>
+    </wml2:MeasurementTVP>
+  </wml2:point>
+</wml2:MeasurementTimeseries>

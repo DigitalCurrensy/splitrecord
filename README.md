@@ -27,7 +27,26 @@ The rest of this file is the formula that command prints.
 
 `--json` prints one object. The process exit code is that object's `exit`. 0 is a pass word (`ok`, `pass`, `scored`, `path`). 1 is a refusal. 2 means the file could not be read. `keep` is false. `absent` is what this output does not contain: a stamp, measured basin months, and the points inside a `.laz` file.
 
-This object is not WaterML and it is not a USGS response. A `.rdb` file is read as one column from `dv_va`. `examples/gauge.rdb` is synthetic. Nothing is fetched from USGS.
+This object is not WaterML and it is not a USGS response. Nothing is fetched. `examples/gauge.rdb`, `examples/gauge.wml11.xml`, `examples/gauge.wml2.xml`, `examples/gauge.dv.json`, and `examples/gauge.ogc.json` are the same three synthetic numbers written in five formats. They are not a gauged basin.
+
+A file already on disk is a column:
+
+| Suffix | What it is | What is read |
+| --- | --- | --- |
+| `.csv` | One number per row | The number |
+| `.rdb` | USGS tab file. `#` comments, a name row, a type row (`5s`, `12n`, `20d`) | `dv_va` |
+| `.xml` | WaterML 1.1, a `value` element with `dateTime`, or WaterML 2.0, a `MeasurementTVP` | The observation |
+| `.json` | Legacy WaterServices JSON (`value.timeSeries`), or an OGC FeatureCollection whose properties include `value` | The observation |
+
+WaterML 1.1 is the CUAHSI XML that legacy WaterServices (`waterservices.usgs.gov`) returns. Its JSON mode is that same tree, not a new schema. WaterML 2.0 is the OGC document (`MeasurementTimeseries`). WaterServices does not serve it. The API that replaces WaterServices is `https://api.waterdata.usgs.gov/ogcapi/`. A daily item is GeoJSON. The properties on a live feature are `time`, `value`, `parameter_code`, `unit_of_measure`, `approval_status`, `qualifier`, `monitoring_location_id`, and `statistic_id`. USGS has said WaterServices will be turned off on 22 February 2027. This library does not call either address.
+
+`Ice`, `Ssn`, and a non-numeric row are a refusal. A JSON record from this program is not a water series, and it is refused.
+
+`examples/left.wml11.xml` and `examples/right.ogc.json` are 1 through 12 and 12 through 1, written by us. The command below prints the same object as `examples/left.csv` and `examples/right.csv`.
+
+```bash
+PYTHONPATH=src python -m splitrecord examples/left.wml11.xml examples/right.ogc.json --json
+```
 
 ```json
 {

@@ -1,0 +1,44 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-01",
+        "value": "1",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-02",
+        "value": "2",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-03",
+        "value": "3",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    }
+  ]
+}

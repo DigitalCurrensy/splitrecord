@@ -1,0 +1,161 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-01",
+        "value": "12",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-02",
+        "value": "11",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-03",
+        "value": "10",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-04",
+        "value": "9",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-05",
+        "value": "8",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-06",
+        "value": "7",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-07",
+        "value": "6",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-08",
+        "value": "5",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-09",
+        "value": "4",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-10",
+        "value": "3",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-11",
+        "value": "2",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_id": "synthetic",
+        "parameter_code": "synthetic",
+        "statistic_id": "synthetic",
+        "time": "2024-01-12",
+        "value": "1",
+        "unit_of_measure": "synthetic",
+        "approval_status": "Working",
+        "qualifier": null
+      }
+    }
+  ]
+}

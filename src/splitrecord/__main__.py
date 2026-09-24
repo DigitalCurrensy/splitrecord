@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Score two one-column CSV files. No header. One number per row."""
+"""Score two numeric columns. CSV, USGS RDB, WaterML, or a USGS JSON file."""
 
 from __future__ import annotations
 
+import json
 import math
 import sys
+import xml.etree.ElementTree as ET
 
 from .record import finish
 from .score import (
@@ -37,14 +39,47 @@ from .score import (
 
 
 def read_column(path: str) -> list[float]:
-    """Read one numeric column, or the dv_va column of a USGS RDB file.
+    """Read one numeric column from a file already on disk.
 
-    An RDB file is the tab-separated daily file NWIS writes to disk. Lines
-    that start with # are comments. The row after the names is the type row
-    (5s, 10n). This reader does not call USGS. A bad row raises ValueError.
+    CSV is one number per row. `.rdb` is the USGS tab file, column `dv_va`.
+    `.xml` is WaterML 1.1 (`value` plus `dateTime`) or WaterML 2.0
+    (`MeasurementTVP`). `.json` is either the legacy WaterServices tree
+    (`value.timeSeries`) or an OGC FeatureCollection whose properties use
+    `value`. This reader does not call USGS. A bad row raises ValueError.
     """
-    if path.endswith(".rdb"):
+    lower = path.lower()
+    if lower.endswith(".rdb"):
         return _read_rdb(path)
+    if lower.endswith(".xml"):
+        return _read_waterml(path)
+    if lower.endswith(".json"):
+        return _read_usgs_json(path)
+    return _read_plain(path)
+
+
+def _finite(path: str, raw: object) -> float:
+    if isinstance(raw, bool) or raw is None:
+        raise ValueError(f"{path}: malformed row")
+    if isinstance(raw, (int, float)):
+        value = float(raw)
+    else:
+        text = str(raw).strip()
+        if text in {"", "Ice", "Ssn", "Eqp", "Rat", "Dis", "Mnt"}:
+            raise ValueError(f"{path}: malformed row")
+        try:
+            value = float(text)
+        except ValueError:
+            raise ValueError(f"{path}: malformed row") from None
+    if not math.isfinite(value):
+        raise ValueError(f"{path}: malformed row")
+    return value
+
+
+def _local(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def _read_plain(path: str) -> list[float]:
     values: list[float] = []
     with open(path, encoding="utf-8") as handle:
         for lineno, line in enumerate(handle, start=1):
@@ -88,6 +123,71 @@ def _read_rdb(path: str) -> list[float]:
                 raise ValueError(f"{path}:{lineno}: malformed row")
             values.append(value)
     return values
+
+
+def _read_waterml(path: str) -> list[float]:
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError as exc:
+        raise ValueError(f"{path}: malformed row") from exc
+    points = [el for el in root.iter() if _local(el.tag) == "MeasurementTVP"]
+    if points:
+        values: list[float] = []
+        for point in points:
+            raw = None
+            for child in list(point):
+                if _local(child.tag) == "value":
+                    raw = child.text
+            values.append(_finite(path, raw))
+        return values
+    values = []
+    for el in root.iter():
+        if _local(el.tag) != "value":
+            continue
+        if not any(_local(key) == "dateTime" for key in el.attrib):
+            continue
+        values.append(_finite(path, el.text))
+    if not values:
+        raise ValueError(f"{path}: malformed row")
+    return values
+
+
+def _read_usgs_json(path: str) -> list[float]:
+    try:
+        with open(path, encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{path}: malformed row") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"{path}: malformed row")
+    if payload.get("type") == "FeatureCollection":
+        features = payload.get("features")
+        if not isinstance(features, list) or not features:
+            raise ValueError(f"{path}: malformed row")
+        values: list[float] = []
+        for feature in features:
+            if not isinstance(feature, dict):
+                raise ValueError(f"{path}: malformed row")
+            props = feature.get("properties")
+            if not isinstance(props, dict) or "value" not in props:
+                raise ValueError(f"{path}: malformed row")
+            values.append(_finite(path, props["value"]))
+        return values
+    series = payload.get("value")
+    if isinstance(series, dict) and isinstance(series.get("timeSeries"), list):
+        values = []
+        for item in series["timeSeries"]:
+            if not isinstance(item, dict):
+                continue
+            for block in item.get("values") or []:
+                if not isinstance(block, dict):
+                    continue
+                for row in block.get("value") or []:
+                    if isinstance(row, dict) and "dateTime" in row:
+                        values.append(_finite(path, row.get("value")))
+        if values:
+            return values
+    raise ValueError(f"{path}: malformed row")
 
 
 def _parse(args: list[str]) -> tuple[str, str, int | None, bool, bool, bool]:
@@ -159,7 +259,7 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         if str(exc) == "usage":
             print(
-                "usage: python -m splitrecord LEFT.csv RIGHT.csv [--seasons N] [--covariance] [--prewhiten] [--json]",
+                "usage: python -m splitrecord LEFT RIGHT [--seasons N] [--covariance] [--prewhiten] [--json]",
                 file=sys.stderr,
             )
             return 2

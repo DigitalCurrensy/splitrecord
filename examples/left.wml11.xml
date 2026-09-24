@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- synthetic. not a USGS retrieval. not a gauged basin. -->
+<ns1:timeSeriesResponse xmlns:ns1="http://www.cuahsi.org/waterML/1.1/">
+  <ns1:timeSeries>
+    <ns1:values>
+      <ns1:value dateTime="2024-01-01T00:00:00">1</ns1:value>
+      <ns1:value dateTime="2024-01-02T00:00:00">2</ns1:value>
+      <ns1:value dateTime="2024-01-03T00:00:00">3</ns1:value>
+      <ns1:value dateTime="2024-01-04T00:00:00">4</ns1:value>
+      <ns1:value dateTime="2024-01-05T00:00:00">5</ns1:value>
+      <ns1:value dateTime="2024-01-06T00:00:00">6</ns1:value>
+      <ns1:value dateTime="2024-01-07T00:00:00">7</ns1:value>
+      <ns1:value dateTime="2024-01-08T00:00:00">8</ns1:value>
+      <ns1:value dateTime="2024-01-09T00:00:00">9</ns1:value>
+      <ns1:value dateTime="2024-01-10T00:00:00">10</ns1:value>
+      <ns1:value dateTime="2024-01-11T00:00:00">11</ns1:value>
+      <ns1:value dateTime="2024-01-12T00:00:00">12</ns1:value>
+    </ns1:values>
+  </ns1:timeSeries>
+</ns1:timeSeriesResponse>
