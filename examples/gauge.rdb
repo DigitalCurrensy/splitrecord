@@ -1,0 +1,7 @@
+# synthetic
+# not a USGS retrieval and not a gauged basin
+agency_cd	site_no	datetime	dv_va	dv_cd
+5s	15s	20d	12n	3s
+USGS	00000000	2024-01-01	1	A
+USGS	00000000	2024-01-02	2	A
+USGS	00000000	2024-01-03	3	A

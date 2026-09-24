@@ -19,6 +19,7 @@ from __future__ import annotations
 import math
 import sys
 
+from .record import finish
 from .score import (
     mann_kendall_variance,
     mann_kendall_z,
@@ -36,7 +37,14 @@ from .score import (
 
 
 def read_column(path: str) -> list[float]:
-    """Read a single numeric column. A bad row raises ValueError."""
+    """Read one numeric column, or the dv_va column of a USGS RDB file.
+
+    An RDB file is the tab-separated daily file NWIS writes to disk. Lines
+    that start with # are comments. The row after the names is the type row
+    (5s, 10n). This reader does not call USGS. A bad row raises ValueError.
+    """
+    if path.endswith(".rdb"):
+        return _read_rdb(path)
     values: list[float] = []
     with open(path, encoding="utf-8") as handle:
         for lineno, line in enumerate(handle, start=1):
@@ -53,14 +61,48 @@ def read_column(path: str) -> list[float]:
     return values
 
 
-def _parse(args: list[str]) -> tuple[str, str, int | None, bool, bool]:
+def _read_rdb(path: str) -> list[float]:
+    names: list[str] | None = None
+    values: list[float] = []
+    with open(path, encoding="utf-8") as handle:
+        for lineno, line in enumerate(handle, start=1):
+            text = line.rstrip("\n")
+            if text == "" or text.startswith("#"):
+                continue
+            parts = text.split("\t")
+            if names is None:
+                names = parts
+                continue
+            if all(part.endswith(("s", "n", "d")) and len(part) > 1 and part[:-1].isdigit() for part in parts):
+                continue
+            if "dv_va" not in names:
+                raise ValueError(f"{path}:{lineno}: malformed row")
+            raw = parts[names.index("dv_va")]
+            if raw in {"", "Ice", "Ssn"}:
+                raise ValueError(f"{path}:{lineno}: malformed row")
+            try:
+                value = float(raw)
+            except ValueError:
+                raise ValueError(f"{path}:{lineno}: malformed row") from None
+            if not math.isfinite(value):
+                raise ValueError(f"{path}:{lineno}: malformed row")
+            values.append(value)
+    return values
+
+
+def _parse(args: list[str]) -> tuple[str, str, int | None, bool, bool, bool]:
     files: list[str] = []
     seasons: int | None = None
     covariance = False
     prewhiten = False
+    as_json = False
     i = 0
     while i < len(args):
         token = args[i]
+        if token == "--json":
+            as_json = True
+            i += 1
+            continue
         if token == "--seasons":
             if i + 1 >= len(args):
                 raise ValueError("usage")
@@ -86,7 +128,7 @@ def _parse(args: list[str]) -> tuple[str, str, int | None, bool, bool]:
         raise ValueError("usage")
     if prewhiten and (seasons is not None or covariance):
         raise ValueError("separate")
-    return files[0], files[1], seasons, covariance, prewhiten
+    return files[0], files[1], seasons, covariance, prewhiten, as_json
 
 
 def _sen_fields(values: list[float], ordinary: float, corrected: float | None = None) -> str:
@@ -113,11 +155,11 @@ def _sen_fields(values: list[float], ordinary: float, corrected: float | None = 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     try:
-        left_path, right_path, seasons, covariance, prewhiten = _parse(args)
+        left_path, right_path, seasons, covariance, prewhiten, as_json = _parse(args)
     except ValueError as exc:
         if str(exc) == "usage":
             print(
-                "usage: python -m splitrecord LEFT.csv RIGHT.csv [--seasons N] [--covariance] [--prewhiten]",
+                "usage: python -m splitrecord LEFT.csv RIGHT.csv [--seasons N] [--covariance] [--prewhiten] [--json]",
                 file=sys.stderr,
             )
             return 2
@@ -159,7 +201,7 @@ def main(argv: list[str] | None = None) -> int:
     if prewhiten:
         assert whitened is not None
         tau_text = "tied" if tau is None else f"{tau:.10g}"
-        print(
+        line = (
             f"rows={len(series)} residual=z(A)-z(B) series=trend-free-prewhiten "
             f"whitened_rows={len(whitened)} removed_sen={removed:.10g} r1={r1:.6g} "
             f"theil_sen_z_per_row={slope:.10g} {_sen_fields(whitened, var)} "
@@ -168,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     elif seasons is None:
         tau_text = "tied" if tau is None else f"{tau:.10g}"
-        print(
+        line = (
             f"rows={len(series)} residual=z(A)-z(B) "
             f"theil_sen_z_per_row={slope:.10g} {_sen_fields(series, ordinary, var)} "
             f"mann_kendall_S={s} tau={tau_text} "
@@ -177,12 +219,13 @@ def main(argv: list[str] | None = None) -> int:
         )
     else:
         variance = "hirsch-slack" if covariance else "seasonal"
-        print(
+        line = (
             f"rows={len(series)} residual=z(A)-z(B) seasons={seasons} "
             f"theil_sen_z_per_year={slope:.10g} seasonal_S={s} "
             f"var={var_text} z={z_text} variance={variance} p={p_text}"
         )
-    return 0
+    word = "scored" if z_text not in {"short", "dependent"} else z_text
+    return finish("splitrecord", "z(A)-z(B), then Theil-Sen and Mann-Kendall", [line], as_json, [word])
 
 
 if __name__ == "__main__":

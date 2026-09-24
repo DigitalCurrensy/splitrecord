@@ -23,6 +23,33 @@ PYTHONPATH=src python -m splitrecord examples/left.csv examples/right.csv
 
 The rest of this file is the formula that command prints.
 
+## Record
+
+`--json` prints one object. The process exit code is that object's `exit`. 0 is a pass word (`ok`, `pass`, `scored`, `path`). 1 is a refusal. 2 means the file could not be read. `keep` is false. `absent` is what this output does not contain: a stamp, measured basin months, and the points inside a `.laz` file.
+
+This object is not WaterML and it is not a USGS response. A `.rdb` file is read as one column from `dv_va`. `examples/gauge.rdb` is synthetic. Nothing is fetched from USGS.
+
+```json
+{
+  "absent": [
+    "stamp",
+    "measured_months",
+    "laz_points"
+  ],
+  "desk": "splitrecord",
+  "exit": 0,
+  "formula": "z(A)-z(B), then Theil-Sen and Mann-Kendall",
+  "keep": false,
+  "rows": [
+    {
+      "line": "rows=12 residual=z(A)-z(B) theil_sen_z_per_row=0.5547001962 sen95=normal sen95_lo=0.5547001962 sen95_hi=0.5547001962 hamed95_lo=0.5547001962 hamed95_hi=0.5547001962 gilbert95_lo=0.5547001962 gilbert95_hi=0.5547001962 mann_kendall_S=66 tau=1 var=212.6666667 n_over_nstar=1 z=4.457215629 variance=hamed-rao p=8.30311e-06",
+      "word": "scored"
+    }
+  ],
+  "word": "scored"
+}
+```
+
 
 SPLITRECORD is for a hydrologist who already holds two official records of one basin.
 

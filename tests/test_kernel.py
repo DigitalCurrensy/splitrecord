@@ -205,6 +205,29 @@ class CommandTests(unittest.TestCase):
         s_value = int(s_token.split("=", 1)[1])
         self.assertNotEqual(s_value, 0)
 
+    def test_json_record_and_rdb_column(self) -> None:
+        import json
+
+        env = dict(os.environ, PYTHONPATH=str(SRC))
+        proc = subprocess.run(
+            [
+                sys.executable, "-m", "splitrecord",
+                str(ROOT / "examples" / "left.csv"),
+                str(ROOT / "examples" / "right.csv"),
+                "--json",
+            ],
+            cwd=ROOT, env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        payload = json.loads(proc.stdout)
+        self.assertEqual(payload["desk"], "splitrecord")
+        self.assertEqual(payload["word"], "scored")
+        self.assertFalse(payload["keep"])
+        self.assertEqual(payload["absent"], ["stamp", "measured_months", "laz_points"])
+        from splitrecord.__main__ import read_column
+
+        self.assertEqual(read_column(str(ROOT / "examples" / "gauge.rdb")), [1.0, 2.0, 3.0])
+
     def test_malformed_row_exits(self) -> None:
         env = dict(os.environ, PYTHONPATH=str(SRC))
         with tempfile.TemporaryDirectory() as tmp:
