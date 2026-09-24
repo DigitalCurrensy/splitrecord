@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: If you use this library, cite the repository.
+title: splitrecord
+abstract: Z-score residual, Theil–Sen slope, and Mann–Kendall for two aligned records. One WaterML 2.0 measurement time-value pair series is read. A categorical series is refused.
+authors:
+  - name: Digital Currensy Inc.
+license: Apache-2.0
+repository-code: https://github.com/DigitalCurrensy/splitrecord

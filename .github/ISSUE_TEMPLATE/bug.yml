@@ -1,0 +1,24 @@
+name: Bug
+description: A printed result does not match the named formula, or a bad number was not refused.
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: command
+    attributes:
+      label: What you ran
+      description: The command and the shape of the file. Do not paste a private key or a file you cannot share.
+    validations:
+      required: true
+  - type: textarea
+    id: printed
+    attributes:
+      label: What printed
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What the README says should print
+    validations:
+      required: true

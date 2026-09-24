@@ -38,7 +38,19 @@ A file already on disk is a column:
 | `.xml` | WaterML 1.1, a `value` element with `dateTime`, or WaterML 2.0, a `MeasurementTVP` | The observation |
 | `.json` | Legacy WaterServices JSON (`value.timeSeries`), or an OGC FeatureCollection whose properties include `value` | The observation |
 
-WaterML 1.1 is the CUAHSI XML that legacy WaterServices (`waterservices.usgs.gov`) returns. Its JSON mode is that same tree, not a new schema. WaterML 2.0 is the OGC document (`MeasurementTimeseries`). WaterServices does not serve it. The API that replaces WaterServices is `https://api.waterdata.usgs.gov/ogcapi/`. A daily item is GeoJSON. The properties on a live feature are `time`, `value`, `parameter_code`, `unit_of_measure`, `approval_status`, `qualifier`, `monitoring_location_id`, and `statistic_id`. USGS has said WaterServices will be turned off on 22 February 2027. This library does not call either address.
+WaterML 1.1 is the CUAHSI XML that legacy WaterServices (`waterservices.usgs.gov`) returns. Its JSON mode is that same tree, not a new schema. WaterML 2.0 is OGC 10-126r4, Part 1, Timeseries. It is an Observations and Measurements document. WaterServices does not serve it. The API that replaces WaterServices is `https://api.waterdata.usgs.gov/ogcapi/`. A daily item is GeoJSON. The properties on a live feature are `time`, `value`, `parameter_code`, `unit_of_measure`, `approval_status`, `qualifier`, `monitoring_location_id`, and `statistic_id`. USGS has said WaterServices will be turned off on 22 February 2027. This library does not call either address.
+
+WaterML 2.0 observation types, and what this command does with each:
+
+| Observation | Result element | What this command does |
+| --- | --- | --- |
+| Timeseries TVP | `MeasurementTimeseries` / `MeasurementTVP` | Reads the measure. One series only. |
+| Timeseries TVP | `CategoricalTimeseries` / `CategoricalTVP` | Refuses. A token is not a number. |
+| Domain-range | `domainSet` and `rangeSet` | Refuses. Two lists are not a paired column. |
+| Collection | two `MeasurementTimeseries` members | Refuses. Joining them would invent one record. |
+| WaterML 1.1 | `value` with `dateTime` | Reads the number. This is not an OGC type. |
+
+A point marked `xsi:nil` is refused, not skipped. Skipping it would move every later row, and the slope is computed on row order. Parts 2, 3, and 4 of WaterML 2 (ratings, surface features, groundwater) are not read. An interpolation type is not applied. The unit is not converted.
 
 `Ice`, `Ssn`, and a non-numeric row are a refusal. A JSON record from this program is not a water series, and it is refused.
 

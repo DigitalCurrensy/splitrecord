@@ -42,8 +42,10 @@ def read_column(path: str) -> list[float]:
     """Read one numeric column from a file already on disk.
 
     CSV is one number per row. `.rdb` is the USGS tab file, column `dv_va`.
-    `.xml` is WaterML 1.1 (`value` plus `dateTime`) or WaterML 2.0
-    (`MeasurementTVP`). `.json` is either the legacy WaterServices tree
+    `.xml` is WaterML 1.1 (`value` plus `dateTime`) or one WaterML 2.0
+    measurement time-value pair series (`MeasurementTVP`). A categorical
+    series, a domain-range series, a nil, and a second series are refused.
+    `.json` is either the legacy WaterServices tree
     (`value.timeSeries`) or an OGC FeatureCollection whose properties use
     `value`. This reader does not call USGS. A bad row raises ValueError.
     """
@@ -125,21 +127,60 @@ def _read_rdb(path: str) -> list[float]:
     return values
 
 
+def _nil(child: ET.Element) -> bool:
+    for key, raw in child.attrib.items():
+        if key.rsplit("}", 1)[-1] == "nil" and str(raw).strip().lower() == "true":
+            return True
+    return False
+
+
 def _read_waterml(path: str) -> list[float]:
+    """Read one numeric column from WaterML already on disk.
+
+    WaterML 2.0 Part 1 (OGC 10-126r4) has two observation shapes and two
+    result types. This function reads one of them.
+
+    Timeseries TVP observation, result `MeasurementTimeseries`: each point
+    is a `MeasurementTVP` (time, then a measure). That column is read.
+    Timeseries TVP observation, result `CategoricalTimeseries`: the value
+    is a token. Refused.
+    Domain-range observation: times and values are two lists (`domainSet`,
+    `rangeSet`). Refused. Pairing those lists would invent the row order.
+    A `Collection` with two `MeasurementTimeseries` members is refused.
+    Joining them would invent one record.
+    A point with `xsi:nil` is refused, not dropped. Dropping it would
+    change the row index the slope uses.
+
+    WaterML 1.1 is the older CUAHSI document, not an OGC type. A `value`
+    element that carries `dateTime` is that column. It is not read when a
+    WaterML 2.0 result is present.
+    """
     try:
         root = ET.parse(path).getroot()
     except ET.ParseError as exc:
         raise ValueError(f"{path}: malformed row") from exc
+    names = [_local(el.tag) for el in root.iter()]
+    if names.count("MeasurementTimeseries") > 1:
+        raise ValueError(f"{path}: more than one series")
     points = [el for el in root.iter() if _local(el.tag) == "MeasurementTVP"]
     if points:
         values: list[float] = []
         for point in points:
             raw = None
+            nil = False
             for child in list(point):
-                if _local(child.tag) == "value":
-                    raw = child.text
+                if _local(child.tag) != "value":
+                    continue
+                raw = child.text
+                nil = _nil(child)
+            if nil:
+                raise ValueError(f"{path}: nil value")
             values.append(_finite(path, raw))
         return values
+    if "CategoricalTimeseries" in names or "CategoricalTVP" in names:
+        raise ValueError(f"{path}: categorical timeseries")
+    if "domainSet" in names or "rangeSet" in names:
+        raise ValueError(f"{path}: domain-range")
     values = []
     for el in root.iter():
         if _local(el.tag) != "value":

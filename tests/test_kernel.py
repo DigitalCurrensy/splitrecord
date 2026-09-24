@@ -257,6 +257,53 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(refused.returncode, 1)
         self.assertNotIn("Traceback", refused.stderr)
 
+    def test_waterml2_refuses_the_other_observation_types(self) -> None:
+        from splitrecord.__main__ import read_column
+
+        def xml(body: str) -> str:
+            return (
+                '<?xml version="1.0"?>'
+                '<root xmlns:wml2="http://www.opengis.net/waterml/2.0" '
+                'xmlns:gml="http://www.opengis.net/gml/3.2" '
+                'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+                f"{body}</root>"
+            )
+
+        nil = xml(
+            "<wml2:MeasurementTimeseries>"
+            "<wml2:point><wml2:MeasurementTVP><wml2:time>2024-01-01</wml2:time>"
+            '<wml2:value xsi:nil="true"/></wml2:MeasurementTVP></wml2:point>'
+            "</wml2:MeasurementTimeseries>"
+        )
+        two = xml(
+            "<wml2:MeasurementTimeseries><wml2:point><wml2:MeasurementTVP>"
+            "<wml2:value>1</wml2:value></wml2:MeasurementTVP></wml2:point></wml2:MeasurementTimeseries>"
+            "<wml2:MeasurementTimeseries><wml2:point><wml2:MeasurementTVP>"
+            "<wml2:value>2</wml2:value></wml2:MeasurementTVP></wml2:point></wml2:MeasurementTimeseries>"
+        )
+        categorical = xml(
+            "<wml2:CategoricalTimeseries><wml2:point><wml2:CategoricalTVP>"
+            "<wml2:time>2024-01-01</wml2:time><wml2:value>high</wml2:value>"
+            "</wml2:CategoricalTVP></wml2:point></wml2:CategoricalTimeseries>"
+        )
+        domain = xml(
+            "<wml2:MeasurementTimeseries><gml:domainSet/><gml:rangeSet>"
+            "<gml:valueList>1 2 3</gml:valueList></gml:rangeSet></wml2:MeasurementTimeseries>"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            for name, body, message in (
+                ("nil.xml", nil, "nil value"),
+                ("two.xml", two, "more than one series"),
+                ("cat.xml", categorical, "categorical timeseries"),
+                ("domain.xml", domain, "domain-range"),
+            ):
+                path = folder / name
+                path.write_text(body, encoding="utf-8")
+                with self.assertRaises(ValueError) as caught:
+                    read_column(str(path))
+                self.assertIn(message, str(caught.exception))
+
     def test_malformed_row_exits(self) -> None:
         env = dict(os.environ, PYTHONPATH=str(SRC))
         with tempfile.TemporaryDirectory() as tmp:
