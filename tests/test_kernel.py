@@ -495,6 +495,20 @@ class SenLimitTests(unittest.TestCase):
         self.assertEqual(sen_limits(series, corrected), ("0.3166666667", "0.3454545455"))
         self.assertNotEqual(sen_limits(series, ordinary), sen_limits(series, corrected))
 
+    def test_two_synthetic_years_are_not_a_basin(self) -> None:
+        import subprocess
+        repo = Path(__file__).resolve().parents[1]
+        proc = subprocess.run(
+            [sys.executable, "-m", "splitrecord", str(repo / "examples" / "season_left.csv"), str(repo / "examples" / "season_right.csv"), "--seasons", "12"],
+            cwd=repo, env={**__import__("os").environ, "PYTHONPATH": str(repo / "src")},
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(
+            proc.stdout.strip(),
+            "rows=24 residual=z(A)-z(B) seasons=12 theil_sen_z_per_year=1.422429001 seasonal_S=12 var=12 z=3.175426481 variance=seasonal p=0.00149616",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
